@@ -21,6 +21,19 @@ def assign_ids_watchlist(df):
     return df
 
 
+def add_cineville_tag(df):
+    """Assign 'cineville' tag for cinemas DataFrame."""
+    cineville_tags = pd.read_csv('cinema_data/cineville_cinemas.csv')
+
+    # Merge with the existing DataFrame based on theater name
+    df = df.merge(cineville_tags, on="name", how="left")
+
+    # Fill NaN values in 'partnered_with_cineville' with 'no' for cinemas not in the CSV
+    df["partnered_with_cineville"] = df["partnered_with_cineville"].fillna("no")
+
+    return df
+
+
 def assign_ids_cinemas(df):
     """Assign `cinema_id` for cinemas DataFrame."""
     df["cinema_id"] = df.apply(lambda row: normalize_and_hash(row["name"], row["location"]), axis=1)
