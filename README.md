@@ -39,11 +39,20 @@ A Python script that scrapes Cineville movie listings and checks whether a film 
 - **Incorporate Likes** Incorporate watch history and likes 
 - **Personalized Recommendations:**  
   - Suggest films based on director
-
-
+  - Predict which Cineville titles you are likely to enjoy based on your watch history
   - Suggest films based on user’s watch history.  
   - Since Letterboxd user data is limited, explore public review data.  
+    - tricky: public movie review data is generally older, cineville films are mostly new
   - Possible approach:  
     1. Identify similar users (even from external datasets).  
     2. Find out what similar users liked.  
     3. Recommend those titles and check if they are playing soon.  
+
+
+Based on your letterboxd watch history, you may enjoy these Cineville films:
+
+Resources:
+https://www.kaggle.com/code/indralin/movielens-project-1-2-collaborative-filtering
+
+datasets:
+https://grouplens.org/datasets/movielens/32m/
