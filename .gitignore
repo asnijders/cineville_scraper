@@ -6,3 +6,4 @@ __pycache__
 *.html
 movie_data
 *_data
+*.sqlite3

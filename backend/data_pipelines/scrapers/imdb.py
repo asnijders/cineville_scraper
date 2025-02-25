@@ -67,6 +67,9 @@ class BaseScraper(ABC):
         else:
             df["imdb_link"] = None  # Handle empty results gracefully
 
+        # drop rows with duplicate imdb links due to e.g. different screening types
+        df = df.drop_duplicates(subset=['imdb_link'], keep='first')
+
         return df
 
 

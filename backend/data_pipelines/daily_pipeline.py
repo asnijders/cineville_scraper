@@ -1,8 +1,8 @@
 import logging
 import pandas as pd
-from scrapers.filmladder import FilmladderScraper
-from utils.helpers import normalize_and_hash
-
+from datetime import datetime
+from data_pipelines.scrapers.filmladder import FilmladderScraper
+from data_pipelines.utils.helpers import normalize_and_hash
 # from db.database import save_movies, save_screenings, save_cinemas
 
 logging.basicConfig(level=logging.INFO)
@@ -19,6 +19,13 @@ def assign_ids_screenings(df):
     return df
 
 
+def clean_screenings(df):
+    df["show_datetime"] = df["show_datetime"].apply(
+            lambda x: datetime.fromisoformat(x) if isinstance(x, str) else x
+        )
+    return df
+
+
 def assign_ids_watchlist(df):
     """Assign `movie_id` and `cinema_id` for screenings DataFrame."""
     df["movie_id"] = df.apply(
@@ -29,7 +36,9 @@ def assign_ids_watchlist(df):
 
 def add_cineville_tag(df):
     """Assign 'cineville' tag for cinemas DataFrame."""
-    cineville_tags = pd.read_csv("external_data/cinema_data/cineville_cinemas.csv")
+    import os
+    print(os.getcwd())
+    cineville_tags = pd.read_csv("data_pipelines/external_data/cinema_data/cineville_cinemas.csv")
 
     # Merge with the existing DataFrame based on theater name
     df = df.merge(cineville_tags, on="name", how="left")
@@ -85,10 +94,13 @@ def run_daily_pipeline():
 
     # 2️⃣ Assign IDs
     screenings_df = assign_ids_screenings(screenings_df)
-    cinemas_df = assign_ids_cinemas(cinemas_df)
+    screenings_df = clean_screenings(screenings_df)
+    cinemas_df = add_cineville_tag(assign_ids_cinemas(cinemas_df))
 
     # 3️⃣ Extract and fetch IMDb metadata for unique movies
-    movies_df = extract_unique_movies(screenings_df)
+    # movies_df = extract_unique_movies(screenings_df)
+
+    return screenings_df, cinemas_df
 
     # movies_df = fetch_metadata(movies_df)
 

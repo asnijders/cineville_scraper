@@ -2,7 +2,7 @@ import time
 import re
 import pandas as pd
 from bs4 import BeautifulSoup
-from scrapers.baseclass import BaseScraper
+from data_pipelines.scrapers.baseclass import BaseScraper
 
 
 class FilmladderScraper(BaseScraper):
