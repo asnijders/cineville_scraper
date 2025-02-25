@@ -29,14 +29,18 @@ A Python script that scrapes Cineville movie listings and checks whether a film 
 ✅ **Scrape Cineville `all_films` page**  
 ⬜ Clean up text (remove elements like "(re-release)", etc.)  
 ✅ Add metadata (theaters, showtimes, ticket links)  
-⬜ Scrape Letterboxd user page  
+✅ Scrape Letterboxd user page
 ⬜ Perform smart semantic matching  
 
 ## Future Features  
 
 - **Extended Lookup:** Include films beyond the next 3 days.  
 - **City Toggle:** Allow users to filter showings by location.  
+- **Incorporate Likes** Incorporate watch history and likes 
 - **Personalized Recommendations:**  
+  - Suggest films based on director
+
+
   - Suggest films based on user’s watch history.  
   - Since Letterboxd user data is limited, explore public review data.  
   - Possible approach:  

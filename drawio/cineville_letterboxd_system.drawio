@@ -1,0 +1,61 @@
+<mxfile host="65bd71144e">
+    <diagram id="system_architecture" name="Page-1">
+        <mxGraphModel dx="785" dy="368" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="Cineville Listings" style="rounded=1;strokeColor=#000000;fillColor=#FFEB3B;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="50" width="160" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="Letterboxd Watchlist" style="rounded=1;strokeColor=#000000;fillColor=#FFEB3B;" parent="1" vertex="1">
+                    <mxGeometry x="390" y="270" width="160" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="Cineville Scraper (Daily)" style="rounded=1;strokeColor=#000000;fillColor=#4CAF50;" parent="1" vertex="1">
+                    <mxGeometry x="270" y="50" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="Letterboxd Scraper" style="rounded=1;strokeColor=#000000;fillColor=#4CAF50;" parent="1" vertex="1">
+                    <mxGeometry x="414" y="180" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="Smart Matching Service" style="rounded=1;strokeColor=#000000;fillColor=#2196F3;" parent="1" vertex="1">
+                    <mxGeometry x="520" y="70" width="200" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="S3 Database" style="shape=cylinder;strokeColor=#000000;fillColor=#9C27B0;" parent="1" vertex="1">
+                    <mxGeometry x="750" y="100" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="Streamlit UI" style="rounded=1;strokeColor=#000000;fillColor=#F44336;" parent="1" vertex="1">
+                    <mxGeometry x="430" y="370" width="200" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="API/Microservice" style="rounded=1;strokeColor=#000000;fillColor=#FF9800;" parent="1" vertex="1">
+                    <mxGeometry x="750" y="250" width="160" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" parent="1" source="2" target="4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" parent="1" source="3" target="5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" parent="1" source="4" target="6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" parent="1" source="5" target="6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" parent="1" source="6" target="7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="15" parent="1" source="7" target="8" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="16" parent="1" source="7" target="9" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="17" parent="1" source="9" target="8" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="18" style="edgeStyle=none;html=1;entryX=0.559;entryY=0.983;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="8" target="3">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
