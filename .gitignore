@@ -2,3 +2,5 @@ env
 data
 temp_data
 __pycache__
+*.json
+*.html
