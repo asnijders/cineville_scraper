@@ -96,6 +96,7 @@ class FilmladderScraper(BaseScraper):
                                 "show_datetime": show_datetime,
                                 "ticket_url": ticket_url,
                                 "rating": rating,
+                                "movie_link": movie_link,
                                 "poster_url": img_url,
                             }
                         )

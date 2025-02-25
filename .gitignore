@@ -5,3 +5,4 @@ __pycache__
 *.json
 *.html
 movie_data
+*_data

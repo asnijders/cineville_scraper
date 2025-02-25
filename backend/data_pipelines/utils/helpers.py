@@ -1,5 +1,6 @@
 import hashlib
 import re
+import pandas as pd
 
 
 def normalize_and_hash(title: str, year: str = None) -> str:
@@ -30,3 +31,11 @@ def normalize_and_hash(title: str, year: str = None) -> str:
 
     # Generate a SHA256 hash and return first 10 characters for uniqueness
     return hashlib.sha256(identifier.encode()).hexdigest()[:10]
+
+
+def add_imdb_ids(df):
+
+    path = 'backend/data_pipelines/external_data/imdb_data/title.basics.tsv.gz'
+    imdb_data = pd.read_csv(path, sep='\t')
+
+    df['idmb_id'] = imbd_data

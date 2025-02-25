@@ -2,28 +2,34 @@ import logging
 import pandas as pd
 from scrapers.filmladder import FilmladderScraper
 from utils.helpers import normalize_and_hash
+
 # from db.database import save_movies, save_screenings, save_cinemas
-# from external.imdb_api import fetch_imdb_metadata
 
 logging.basicConfig(level=logging.INFO)
 
 
 def assign_ids_screenings(df):
     """Assign `movie_id` and `cinema_id` for screenings DataFrame."""
-    df["movie_id"] = df.apply(lambda row: normalize_and_hash(row["title"], row["year"]), axis=1)
-    df["cinema_id"] = df.apply(lambda row: normalize_and_hash(row["cinema_name"], "Amsterdam"), axis=1)
+    df["movie_id"] = df.apply(
+        lambda row: normalize_and_hash(row["title"], row["year"]), axis=1
+    )
+    df["cinema_id"] = df.apply(
+        lambda row: normalize_and_hash(row["cinema_name"], "Amsterdam"), axis=1
+    )
     return df
 
 
 def assign_ids_watchlist(df):
     """Assign `movie_id` and `cinema_id` for screenings DataFrame."""
-    df["movie_id"] = df.apply(lambda row: normalize_and_hash(row["title"], row["year"]), axis=1)
+    df["movie_id"] = df.apply(
+        lambda row: normalize_and_hash(row["title"], row["year"]), axis=1
+    )
     return df
 
 
 def add_cineville_tag(df):
     """Assign 'cineville' tag for cinemas DataFrame."""
-    cineville_tags = pd.read_csv('cinema_data/cineville_cinemas.csv')
+    cineville_tags = pd.read_csv("external_data/cinema_data/cineville_cinemas.csv")
 
     # Merge with the existing DataFrame based on theater name
     df = df.merge(cineville_tags, on="name", how="left")
@@ -34,23 +40,39 @@ def add_cineville_tag(df):
     return df
 
 
+def add_imdb_links(df):
+    """"Assign imdb links for movies dataframe"""
+    from scrapers.imdb import IMDBScraper
+    scraper = IMDBScraper(headless=True)
+    df = scraper.run(df)
+    return df
+
+
 def assign_ids_cinemas(df):
     """Assign `cinema_id` for cinemas DataFrame."""
-    df["cinema_id"] = df.apply(lambda row: normalize_and_hash(row["name"], row["location"]), axis=1)
+    df["cinema_id"] = df.apply(
+        lambda row: normalize_and_hash(row["name"], row["location"]), axis=1
+    )
     return df
 
 
 def extract_unique_movies(df):
     """Extract unique movies from screenings DataFrame."""
-    movies_df = df[["movie_id", "title", "year"]].drop_duplicates().reset_index(drop=True)
+    movies_df = (
+        df[["movie_id", "title", "year", "movie_link"]]
+        .drop_duplicates()
+        .reset_index(drop=True)
+    )
     return movies_df
 
 
 def fetch_metadata(movies_df):
     """Fetch IMDb metadata for a list of movies."""
-    movies_df["metadata"] = movies_df.apply(lambda row: fetch_imdb_metadata(row["title"], row["year"]), axis=1)
+    movies_df["metadata"] = movies_df.apply(
+        lambda row: fetch_imdb_metadata(row["title"], row["year"]), axis=1
+    )
     metadata_df = pd.json_normalize(movies_df["metadata"])  # Flatten nested IMDb data
-    movies_df = pd.concat([movies_df.drop(columns=["metadata"]), metadata_df], axis=1)  
+    movies_df = pd.concat([movies_df.drop(columns=["metadata"]), metadata_df], axis=1)
     return movies_df
 
 
