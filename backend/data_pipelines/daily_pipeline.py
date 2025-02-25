@@ -15,6 +15,12 @@ def assign_ids_screenings(df):
     return df
 
 
+def assign_ids_watchlist(df):
+    """Assign `movie_id` and `cinema_id` for screenings DataFrame."""
+    df["movie_id"] = df.apply(lambda row: normalize_and_hash(row["title"], row["year"]), axis=1)
+    return df
+
+
 def assign_ids_cinemas(df):
     """Assign `cinema_id` for cinemas DataFrame."""
     df["cinema_id"] = df.apply(lambda row: normalize_and_hash(row["name"], row["location"]), axis=1)
@@ -48,12 +54,13 @@ def run_daily_pipeline():
 
     # 3️⃣ Extract and fetch IMDb metadata for unique movies
     movies_df = extract_unique_movies(screenings_df)
-    movies_df = fetch_metadata(movies_df)
 
-    # 4️⃣ Store data in the database
-    save_movies(movies_df)
-    save_screenings(screenings_df)
-    save_cinemas(cinemas_df)
+    # movies_df = fetch_metadata(movies_df)
+
+    # # 4️⃣ Store data in the database
+    # save_movies(movies_df)
+    # save_screenings(screenings_df)
+    # save_cinemas(cinemas_df)
 
     logging.info("Daily data pipeline completed.")
 

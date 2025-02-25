@@ -13,11 +13,11 @@ class FilmladderScraper(BaseScraper):
     def fetch_data(self):
         """Navigate to the Filmladder page and fetch the HTML content."""
         self.driver.get(self.FILMLADDER_URL)
-        time.sleep(3)  # Allow page to load
+        time.sleep(0.5)  # Allow page to load
 
         # Simulate scrolling to trigger lazy loading
         self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(3)
+        time.sleep(0.5)
 
         return self.driver.page_source  # Return full page HTML
 
@@ -49,7 +49,7 @@ class FilmladderScraper(BaseScraper):
             # Store cinema metadata
             cinemas_data.append(
                 {
-                    "name": cinema_name,
+                    "name": cinema_name.lower(),
                     "location": "Amsterdam",
                     "address": address,
                     "website": website,
@@ -90,8 +90,8 @@ class FilmladderScraper(BaseScraper):
 
                         screenings_data.append(
                             {
-                                "cinema_name": cinema_name,
-                                "title": title,
+                                "cinema_name": cinema_name.lower(),
+                                "title": title.lower(),
                                 "year": movie_year,
                                 "show_datetime": show_datetime,
                                 "ticket_url": ticket_url,

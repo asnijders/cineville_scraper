@@ -18,16 +18,16 @@ class LetterboxdScraper(BaseScraper):
         all_html = []
 
         while True:
-            time.sleep(2)  # Wait for content to load
+            time.sleep(0.5)  # Wait for content to load
             all_html.append(self.driver.page_source)  # Save HTML content
 
             # Try to find and click the "Next" button
             try:
-                next_button = WebDriverWait(self.driver, 5).until(
+                next_button = WebDriverWait(self.driver, 0.5).until(
                     EC.element_to_be_clickable((By.CLASS_NAME, "next"))
                 )
                 next_button.click()
-                time.sleep(2)  # Allow new content to load
+                time.sleep(0.5)  # Allow new content to load                
             except:
                 break  # Exit loop when no more pages
 
@@ -51,7 +51,7 @@ class LetterboxdScraper(BaseScraper):
 
             movies.append(
                 {
-                    "title": title,
+                    "title": title.lower(),
                     "year": None,  # Year needs to be fetched separately
                     "link": link,
                     "poster_url": poster_url,
@@ -60,7 +60,15 @@ class LetterboxdScraper(BaseScraper):
                 }
             )
 
-        return pd.DataFrame(movies)
+        movies = pd.DataFrame(movies)
+
+        # Extract year and move it to 'year' column
+        movies["year"] = movies["title"].str.extract(r"\((\d{4})\)").astype("Int64")
+
+        # Remove the year from the title and lowercase it
+        movies["title"] = movies["title"].str.replace(r"\s*\(\d{4}\)", "", regex=True).str.lower()
+
+        return movies
 
     def run(self):
         """Execute full scraping pipeline and return structured DataFrames."""
