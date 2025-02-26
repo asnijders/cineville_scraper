@@ -61,15 +61,16 @@ def save_movies(movies_df):
 
 
 def get_existing_movies():
-    """Fetch existing movie titles & years from the database."""
+    """Fetch all existing movies from the database."""
     session = SessionLocal()
     try:
-        existing_movies = session.query(Movie.movie_id,
-                                        Movie.title,
-                                        Movie.year,
-                                        Movie.movie_link,
-                                        Movie.imdb_link).all()
-        return pd.DataFrame(existing_movies)
+        existing_movies = session.query(Movie).all()
+        if existing_movies == []:
+            return None
+        else:
+            return pd.DataFrame([movie.__dict__ for movie in existing_movies]).drop(
+                columns=["_sa_instance_state"]
+        )
     finally:
         session.close()
 
