@@ -12,7 +12,11 @@ logging.basicConfig(level=logging.INFO)
 
 def get_new_movies(scraped_movies):
     existing_movies = get_existing_movies()
-    return scraped_movies[~scraped_movies['movie_id'].isin(existing_movies['movie_id'])]
+    if existing_movies is None:
+        print('No existing Movies table found')
+        return scraped_movies
+    else:
+        return scraped_movies[~scraped_movies['movie_id'].isin(existing_movies['movie_id'])]
 
 
 def assign_ids_screenings(df):
