@@ -3,6 +3,7 @@ from data_models.movies import Movie
 from data_models.cinemas import Cinema
 from data_models.screenings import Screening
 from sqlalchemy import text
+import pandas as pd
 
 
 def get_db_session():
@@ -55,6 +56,20 @@ def save_movies(movies_df):
             session.bulk_insert_mappings(Movie, new_movies)
 
         session.commit()
+    finally:
+        session.close()
+
+
+def get_existing_movies():
+    """Fetch existing movie titles & years from the database."""
+    session = SessionLocal()
+    try:
+        existing_movies = session.query(Movie.movie_id,
+                                        Movie.title,
+                                        Movie.year,
+                                        Movie.movie_link,
+                                        Movie.imdb_link).all()
+        return pd.DataFrame(existing_movies)
     finally:
         session.close()
 
