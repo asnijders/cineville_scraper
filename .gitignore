@@ -8,3 +8,4 @@ movie_data
 *_data
 *.sqlite3
 .ipynb_checkpoints
+explore
