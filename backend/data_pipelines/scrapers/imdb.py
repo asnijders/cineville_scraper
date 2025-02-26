@@ -54,6 +54,7 @@ class BaseScraper(ABC):
 
         for i, url in enumerate(tqdm(urls, desc="Scraping Progress")):
             raw_html = self.fetch_data(url)
+            # print(raw_html)
             imdb_link = self.parse_data(raw_html)
             time.sleep(random.uniform(0.3, 1.0))  # Random delay to avoid detection
             results.append((url, imdb_link))  # Append results properly
@@ -85,7 +86,21 @@ class IMDBScraper(BaseScraper):
     def parse_data(self, raw_html):
         """Parse and extract IMDb data-link from HTML."""
         soup = BeautifulSoup(raw_html, "html.parser")
+        
+        # Try to find the IMDb rating span first
         imdb_span = soup.find("span", class_="imdb-rating star-rating")
         if imdb_span and imdb_span.has_attr("data-link"):
             return imdb_span["data-link"]
-        return None
+
+        # If not found, try to find the IMDb button div
+        imdb_div = soup.find("div", class_="imdb-button")
+        if imdb_div and imdb_div.has_attr("data-link"):
+            return imdb_div["data-link"]
+
+        return None  # Return None if no IMDb link is found
+
+
+
+        # imdb_span = soup.find("div", class_="imdb-button")
+        # if imdb_span and imdb_span.has_attr("data-link"):
+        #     return imdb_span["data-link"]
