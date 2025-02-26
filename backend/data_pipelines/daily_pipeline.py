@@ -98,6 +98,8 @@ def run_daily_pipeline():
     cinemas_df = add_cineville_tag(assign_ids_cinemas(cinemas_df))
 
     # 3️⃣ Extract and fetch IMDb metadata for unique movies
+    # TODO: first reference movies_df with existing movies sqlite backend.
+    # only fetch IMDB links for new titles.
     # movies_df = extract_unique_movies(screenings_df)
 
     return screenings_df, cinemas_df
