@@ -3,9 +3,16 @@ import pandas as pd
 from datetime import datetime
 from data_pipelines.scrapers.filmladder import FilmladderScraper
 from data_pipelines.utils.helpers import normalize_and_hash
+from data_pipelines.save_to_db import get_existing_movies
+
 # from db.database import save_movies, save_screenings, save_cinemas
 
 logging.basicConfig(level=logging.INFO)
+
+
+def get_new_movies(scraped_movies):
+    existing_movies = get_existing_movies()
+    return scraped_movies[~scraped_movies['movie_id'].isin(existing_movies['movie_id'])]
 
 
 def assign_ids_screenings(df):
@@ -21,8 +28,8 @@ def assign_ids_screenings(df):
 
 def clean_screenings(df):
     df["show_datetime"] = df["show_datetime"].apply(
-            lambda x: datetime.fromisoformat(x) if isinstance(x, str) else x
-        )
+        lambda x: datetime.fromisoformat(x) if isinstance(x, str) else x
+    )
     return df
 
 
@@ -37,8 +44,11 @@ def assign_ids_watchlist(df):
 def add_cineville_tag(df):
     """Assign 'cineville' tag for cinemas DataFrame."""
     import os
+
     print(os.getcwd())
-    cineville_tags = pd.read_csv("data_pipelines/external_data/cinema_data/cineville_cinemas.csv")
+    cineville_tags = pd.read_csv(
+        "data_pipelines/external_data/cinema_data/cineville_cinemas.csv"
+    )
 
     # Merge with the existing DataFrame based on theater name
     df = df.merge(cineville_tags, on="name", how="left")
@@ -50,8 +60,9 @@ def add_cineville_tag(df):
 
 
 def add_imdb_links(df):
-    """"Assign imdb links for movies dataframe"""
+    """ "Assign imdb links for movies dataframe"""
     from scrapers.imdb import IMDBScraper
+
     scraper = IMDBScraper(headless=True)
     df = scraper.run(df)
     return df
