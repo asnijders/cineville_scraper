@@ -37,23 +37,18 @@ def save_cinemas(cinemas_df):
 
 
 def save_movies(movies_df):
-    """Insert or update movies efficiently."""
+    """Insert or update movies efficiently while avoiding UNIQUE constraint errors."""
     session = get_db_session()
     try:
-        existing_movie_ids = {m.movie_id for m in session.query(Movie.movie_id).all()}
-        new_movies, updated_movies = [], []
-
         for _, row in movies_df.iterrows():
-            row_dict = row.to_dict()
-            if row["movie_id"] in existing_movie_ids:
-                updated_movies.append(row_dict)
+            existing_movie = session.query(Movie).filter_by(imdb_link=row["imdb_link"]).first()
+            if existing_movie:
+                # Update the existing movie
+                for key, value in row.to_dict().items():
+                    setattr(existing_movie, key, value)
             else:
-                new_movies.append(row_dict)
-
-        if updated_movies:
-            session.bulk_update_mappings(Movie, updated_movies)
-        if new_movies:
-            session.bulk_insert_mappings(Movie, new_movies)
+                # Insert a new movie
+                session.add(Movie(**row.to_dict()))
 
         session.commit()
     finally:
