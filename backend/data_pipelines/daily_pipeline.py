@@ -4,6 +4,7 @@ from datetime import datetime
 from data_pipelines.scrapers.filmladder import FilmladderScraper
 from data_pipelines.utils.helpers import normalize_and_hash
 from data_pipelines.save_to_db import get_existing_movies
+from rapidfuzz import process
 
 # from db.database import save_movies, save_screenings, save_cinemas
 
@@ -13,27 +14,64 @@ logging.basicConfig(level=logging.INFO)
 def get_new_movies(scraped_movies):
     existing_movies = get_existing_movies()
     if existing_movies is None:
-        print('No existing Movies table found')
+        print("No existing Movies table found")
         return scraped_movies
-    else:
-        return scraped_movies[~scraped_movies['movie_id'].isin(existing_movies['movie_id'])]
+
+    existing_titles = existing_movies["title"].tolist()
+
+    def is_title_new(scraped_title):
+        match, score, _ = process.extractOne(scraped_title, existing_titles)
+        found_match = score >= 90  # Adjust threshold as needed
+        print(
+            f"Scraped: '{scraped_title}' | Matched: '{match}' (Existing DB) | Score: {score:.2f} | Found: {found_match}"
+        )
+        return not found_match
+
+    return scraped_movies[scraped_movies["title"].apply(is_title_new)]
 
 
-def assign_ids_screenings(df):
-    """Assign `movie_id` and `cinema_id` for screenings DataFrame."""
-    df["movie_id"] = df.apply(
-        lambda row: normalize_and_hash(row["title"], row["year"]), axis=1
-    )
-    df["cinema_id"] = df.apply(
-        lambda row: normalize_and_hash(row["cinema_name"], "Amsterdam"), axis=1
-    )
-    return df
+def process_screenings(df):
 
+    def deduplicate_movie_titles(screenings_df, title_column="title", threshold=90):
+        unique_titles = screenings_df[title_column].unique()
+        grouped_titles = {}
 
-def clean_screenings(df):
+        for title in unique_titles:
+            matches = process.extract(title, unique_titles, limit=None)
+            similar_titles = [match[0] for match in matches if match[1] >= threshold]
+
+            if not similar_titles:
+                print(f"Title '{title}' did not meet the threshold and was discarded.")
+                continue
+
+            # Find the shortest title among similar ones
+            shortest_title = min(similar_titles, key=len)
+
+            for t in similar_titles:
+                grouped_titles[t] = shortest_title
+
+        # Replace titles in the dataframe
+        df = screenings_df.copy()
+        df[title_column] = df[title_column].map(grouped_titles)
+        return df
+
+    def assign_ids_screenings(df):
+        """Assign `movie_id` and `cinema_id` for screenings DataFrame."""
+        df["movie_id"] = df.apply(
+            lambda row: normalize_and_hash(row["title"], row["year"]), axis=1
+        )
+        df["cinema_id"] = df.apply(
+            lambda row: normalize_and_hash(row["cinema_name"], "Amsterdam"), axis=1
+        )
+        return df
+
     df["show_datetime"] = df["show_datetime"].apply(
         lambda x: datetime.fromisoformat(x) if isinstance(x, str) else x
     )
+
+    df = deduplicate_movie_titles(df)
+    df = assign_ids_screenings(df)
+
     return df
 
 
@@ -45,23 +83,45 @@ def assign_ids_watchlist(df):
     return df
 
 
-def add_cineville_tag(df):
-    """Assign 'cineville' tag for cinemas DataFrame."""
-    import os
+def process_cinemas(df):
 
-    print(os.getcwd())
-    cineville_tags = pd.read_csv(
-        "data_pipelines/external_data/cinema_data/cineville_cinemas.csv"
-    )
+    def add_cineville_tag(df):
+        """Assign 'cineville' tag for cinemas DataFrame."""
+        import os
 
-    # Merge with the existing DataFrame based on theater name
-    df = df.merge(cineville_tags, on="name", how="left")
+        print(os.getcwd())
+        cineville_tags = pd.read_csv(
+            "data_pipelines/external_data/cinema_data/cineville_cinemas.csv"
+        )
 
-    # Fill NaN values in 'partnered_with_cineville' with 'no' for cinemas not in the CSV
-    df["partnered_with_cineville"] = df["partnered_with_cineville"].fillna("no")
+        # Merge with the existing DataFrame based on theater name
+        df = df.merge(cineville_tags, on="name", how="left")
 
+        # Fill NaN values in 'partnered_with_cineville' with 'no' for cinemas not in the CSV
+        df["partnered_with_cineville"] = df["partnered_with_cineville"].fillna("no")
+
+        return df
+
+    def assign_ids_cinemas(df):
+        """Assign `cinema_id` for cinemas DataFrame."""
+        df["cinema_id"] = df.apply(
+            lambda row: normalize_and_hash(row["name"], row["location"]), axis=1
+        )
+        return df
+
+    df = assign_ids_cinemas(df)
+    df = add_cineville_tag(df)
     return df
 
+
+def process_enriched_movies(df):
+
+    df = df.copy()
+    df["release_date"] = pd.to_datetime(df["release_date"]).dt.date
+    df['year'] = df['imdb_year']
+    df = df.where(pd.notna(df), None)
+
+    return df
 
 def add_imdb_links(df):
     """ "Assign imdb links for movies dataframe"""
@@ -69,14 +129,6 @@ def add_imdb_links(df):
 
     scraper = IMDBScraper(headless=True)
     df = scraper.run(df)
-    return df
-
-
-def assign_ids_cinemas(df):
-    """Assign `cinema_id` for cinemas DataFrame."""
-    df["cinema_id"] = df.apply(
-        lambda row: normalize_and_hash(row["name"], row["location"]), axis=1
-    )
     return df
 
 
