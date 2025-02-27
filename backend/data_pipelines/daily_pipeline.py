@@ -115,13 +115,16 @@ def process_cinemas(df):
 
 
 def process_enriched_movies(df):
-
     df = df.copy()
     df["release_date"] = pd.to_datetime(df["release_date"]).dt.date
-    df['year'] = df['imdb_year']
+
+    # Assign imdb_year only if 'year' column is empty or None
+    df["year"] = df["year"].where(df["year"].notna(), df["imdb_year"])
+
     df = df.where(pd.notna(df), None)
 
     return df
+
 
 def add_imdb_links(df):
     """ "Assign imdb links for movies dataframe"""
