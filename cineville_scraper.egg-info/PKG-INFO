@@ -1,0 +1,12 @@
+Metadata-Version: 2.2
+Name: cineville_scraper
+Version: 0.1.0
+Summary: A scraper and frontend for Cineville movie data
+Author-email: Your Name <your.email@example.com>
+Requires-Dist: beautifulsoup4>=4.13
+Requires-Dist: requests>=2.32
+Requires-Dist: selenium>=4.29
+Requires-Dist: pandas>=2.2
+Requires-Dist: SQLAlchemy>=2.0
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: tqdm>=4.67
