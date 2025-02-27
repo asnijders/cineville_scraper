@@ -96,45 +96,56 @@ class IMDBScraper(BaseScraper):
     def parse_data(self, raw_html):
         """Parse and extract metadata from IMDb HTML content."""
         soup = BeautifulSoup(raw_html, "html.parser")
-        json_ld = self.parse_json_ld(soup)
+        json_ld = self.parse_json_ld(soup)  # Extract JSON-LD data
+        next_data = self.parse_next_data(soup)  # Extract __NEXT_DATA__ JSON
 
         metadata = {
-            # "title": self.extract_field(soup, "h1"),
-            "imdb_year": json_ld.get("datePublished", "").split("-")[
-                0
-            ],  # Extract only the year
-            "rating": json_ld.get("aggregateRating", {}).get("ratingValue"),
-            "genres": self.extract_field(soup, "span.ipc-chip__text", multiple=True),
-            "content_rating": json_ld.get("contentRating"),
-            "duration": json_ld.get("duration"),
-            "director": (
-                [d["name"] for d in json_ld.get("director", []) if "name" in d]
-                if isinstance(json_ld.get("director"), list)
-                else None
-            ),
-            "writers": (
-                [w["name"] for w in json_ld.get("creator", []) if "name" in w]
-                if isinstance(json_ld.get("creator"), list)
-                else None
-            ),
-            "actors": (
-                [a["name"] for a in json_ld.get("actor", []) if "name" in a]
-                if isinstance(json_ld.get("actor"), list)
-                else None
-            ),
-            "rating_count": json_ld.get("aggregateRating", {}).get("ratingCount"),
+            "title": json_ld.get("name") or next_data.get("titleText", {}).get("text"),
+            "original_title": json_ld.get("alternativeHeadline") or next_data.get("originalTitleText", {}).get("text"),
+            "imdb_year": (json_ld.get("datePublished", "").split("-")[0] 
+                        or str(next_data.get("releaseYear", {}).get("year"))),
+            "rating": json_ld.get("aggregateRating", {}).get("ratingValue") 
+                        or next_data.get("ratingsSummary", {}).get("aggregateRating"),
+            "genres": (self.extract_field(soup, "span.ipc-chip__text", multiple=True) 
+                    or [g["text"] for g in next_data.get("genres", {}).get("genres", [])]),
+            "content_rating": json_ld.get("contentRating") 
+                            or next_data.get("certificate", {}).get("rating"),
+            "duration": json_ld.get("duration") 
+                        or next_data.get("runtime", {}).get("displayableProperty", {}).get("value", {}).get("plainText"),
+            "director": [d["name"] for d in json_ld.get("director", []) if "name" in d] 
+                        if isinstance(json_ld.get("director"), list) else None,
+            "writers": [w["name"] for w in json_ld.get("creator", []) if "name" in w] 
+                        if isinstance(json_ld.get("creator"), list) else None,
+            "actors": [a["name"] for a in json_ld.get("actor", []) if "name" in a] 
+                    if isinstance(json_ld.get("actor"), list) else None,
+            "rating_count": json_ld.get("aggregateRating", {}).get("ratingCount") 
+                            or next_data.get("ratingsSummary", {}).get("voteCount"),
             "plot": json_ld.get("description"),
-            "release_date": json_ld.get("datePublished"),  # Keep full date
-            "keywords": (
-                json_ld.get("keywords", "").split(", ")
-                if json_ld.get("keywords")
-                else []
-            ),
-            "poster_url": json_ld.get("image"),
-            "trailer_url": json_ld.get("trailer", {}).get("embedUrl"),
+            "release_date": json_ld.get("datePublished"),
+                            # or f"{next_data.get('releaseDate', {}).get('year', '')}-" \
+                            #     f"{next_data.get('releaseDate', {}).get('month', '')}-" \
+                            #     f"{next_data.get('releaseDate', {}).get('day', '')}",
+            "keywords": json_ld.get("keywords", "").split(", ") if json_ld.get("keywords") else 
+                        [k["node"]["text"] for k in next_data.get("keywords", {}).get("edges", [])],
+            "poster_url": json_ld.get("image") 
+                        or next_data.get("primaryImage", {}).get("url"),
+            "trailer_url": json_ld.get("trailer", {}).get("embedUrl") 
+                            or (next_data.get("primaryVideos", {}).get("edges", [{}])[0]
+                                .get("node", {}).get("playbackURLs", [{}])[0].get("url")),
         }
-
+        
         return metadata
+
+
+    def parse_next_data(self, soup):
+        """Extract data from __NEXT_DATA__ JSON."""
+        next_data_script = soup.find("script", id="__NEXT_DATA__", type="application/json")
+        if next_data_script:
+            try:
+                return json.loads(next_data_script.string).get("props", {}).get("pageProps", {}).get("aboveTheFoldData", {})
+            except json.JSONDecodeError:
+                pass  # Return empty dict if parsing fails
+        return {}
 
     def run(self, df):
         """Execute full scraping pipeline to gather IMDb metadata."""
@@ -145,7 +156,7 @@ class IMDBScraper(BaseScraper):
             raw_html = self.fetch_data(url)
             metadata = self.parse_data(raw_html)
             metadata["imdb_link"] = url  # Ensure we keep the link for merging
-            time.sleep(random.uniform(1, 4))  # Random to avoid detection
+            time.sleep(random.uniform(1, 3))  # Random to avoid detection
             self.metadata_results.append(metadata)
 
         self.driver.quit()  # Quit driver after scraping
