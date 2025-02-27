@@ -139,9 +139,11 @@ def extract_unique_movies(df):
     """Extract unique movies from screenings DataFrame."""
     movies_df = (
         df[["movie_id", "title", "year", "movie_link"]]
-        .drop_duplicates()
+        .drop_duplicates('movie_id')
         .reset_index(drop=True)
     )
+
+
     return movies_df
 
 
