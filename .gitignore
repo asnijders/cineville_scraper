@@ -1,4 +1,5 @@
 env
+explore
 data
 temp_data
 __pycache__
@@ -8,4 +9,6 @@ movie_data
 *_data
 *.sqlite3
 .ipynb_checkpoints
-explore
+
+
+
