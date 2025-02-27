@@ -4,17 +4,15 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
-from scrapers.baseclass import BaseScraper
+from backend.data_pipelines.scrapers.baseclass import BaseScraper
 
 
 class LetterboxdScraper(BaseScraper):
     """Scraper for Letterboxd watchlist."""
 
-    BASE_URL = "https://letterboxd.com/ard_s/watchlist/"
-
-    def fetch_data(self):
+    def fetch_data(self, url):
         """Fetch all pages of the Letterboxd watchlist."""
-        self.driver.get(self.BASE_URL)
+        self.driver.get(url)
         all_html = []
 
         while True:
@@ -23,11 +21,11 @@ class LetterboxdScraper(BaseScraper):
 
             # Try to find and click the "Next" button
             try:
-                next_button = WebDriverWait(self.driver, 0.5).until(
+                next_button = WebDriverWait(self.driver, 0.1).until(
                     EC.element_to_be_clickable((By.CLASS_NAME, "next"))
                 )
                 next_button.click()
-                time.sleep(0.5)  # Allow new content to load                
+                time.sleep(0.3)  # Allow new content to load                
             except:
                 break  # Exit loop when no more pages
 
@@ -70,9 +68,9 @@ class LetterboxdScraper(BaseScraper):
 
         return movies
 
-    def run(self):
+    def run(self, url):
         """Execute full scraping pipeline and return structured DataFrames."""
-        raw_html = self.fetch_data()
+        raw_html = self.fetch_data(url)
         watchlist_df = self.parse_data(raw_html=raw_html)
         self.driver.quit()
         return watchlist_df
