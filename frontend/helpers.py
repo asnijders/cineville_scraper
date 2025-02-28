@@ -46,8 +46,8 @@ def load_image(image_url, movie_id):
             )  # Ensure the image is in RGB format for better quality
 
             # # Resize image to fit well in the container (ensure it's not too large)
-            # max_size = (680, 924)  # Adjust as needed
-            # image.thumbnail(max_size)
+            max_size = (320, 435)  # Adjust as needed
+            image.thumbnail(max_size)
 
             # Save the image to the media folder
             image.save(image_path)
