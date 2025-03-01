@@ -2,8 +2,6 @@ import streamlit as st
 from datetime import datetime, timedelta
 from helpers import (
     get_filtered_movies,
-    format_day,
-    fuzzy_match_titles,
     load_image,
     get_watchlist_titles,
     round_to_quarter_hour,
@@ -49,6 +47,7 @@ with st.expander("Advanced Filters"):
         return get_watchlist_titles(username) if username else []
 
     watchlist_titles = get_watchlist(letterboxd_username)
+
     only_watchlist = st.checkbox("Only show my Letterboxd watchlist", value=False)
 
 col3, col4 = st.columns([1, 1])
