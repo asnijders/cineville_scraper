@@ -44,7 +44,7 @@ def get_db_connection():
 def get_filtered_movies(selected_day, selected_time, only_cineville, watchlist_titles):
     conn = get_db_connection()
     query = """
-        SELECT m.movie_id, m.title, m.year, m.rating, m.plot, m.duration,
+        SELECT DISTINCT(m.movie_id), m.title, m.year, m.rating, m.plot, m.duration,
                m.director, m.genres, c.name AS cinema, c.partnered_with_cineville, 
                s.show_datetime, s.ticket_url, m.poster_url
         FROM screenings s
