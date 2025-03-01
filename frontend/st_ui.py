@@ -109,10 +109,13 @@ if not movies_df.empty:
                     f"<h3 style='margin-bottom:0;'>{title} ({int(year)})</h3>",
                     unsafe_allow_html=True,
                 )
+
                 if plot:
                     st.write(plot)
                 if rating:
                     st.write(f"Rating: ({rating:.1f}/10)")
+                if title.lower() in watchlist_titles:
+                    st.write('_On your Letterboxd watchlist_.')
 
                 with st.expander("Screenings"):
                     for day, screenings_list in sorted_screenings_by_day.items():
