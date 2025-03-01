@@ -7,9 +7,8 @@ from PIL import Image
 import logging
 import time
 from backend.data_pipelines.scrapers.letterboxd import LetterboxdScraper
-from backend.data_pipelines.scrapers.letterboxdasync import LetterboxdScraperNew
 import os
-import streamlit as st
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +19,6 @@ MEDIA_FOLDER = "media"
 os.makedirs(MEDIA_FOLDER, exist_ok=True)
 
 
-# @st.cache_data(show_spinner=False)
 def load_image(image_url, movie_id):
     image_path = os.path.join(MEDIA_FOLDER, f"{movie_id}_poster.jpg")
     if os.path.exists(image_path):
@@ -41,7 +39,6 @@ def get_db_connection():
     return sqlite3.connect("backend/db.sqlite3", check_same_thread=False)
 
 
-# @st.cache_data(show_spinner=False)
 def get_filtered_movies(selected_day, selected_time, only_cineville, watchlist_titles):
     conn = get_db_connection()
     query = """
@@ -104,7 +101,7 @@ def get_watchlist_titles(username):
 
     # --- Step 1: Scrape Letterboxd Watchlist ---
     scrape_start_time = time.time()
-    lb_scraper = LetterboxdScraperNew()
+    lb_scraper = LetterboxdScraper()
     watchlist_df = lb_scraper.run(f"https://letterboxd.com/{username}/watchlist/")
     watchlist_titles = watchlist_df.title.tolist()
     scrape_end_time = time.time()
@@ -132,7 +129,9 @@ def get_watchlist_titles(username):
             watchlist_title, db_titles, scorer=fuzz.token_sort_ratio
         )
         if score >= 95:  # Lower threshold for better flexibility
-            logger.info(f"Strong match found for: {watchlist_title} -> {match} ({score})")
+            logger.info(
+                f"Strong match found for: {watchlist_title} -> {match} ({score})"
+            )
             matched_titles.append(match)
 
     match_end_time = time.time()

@@ -1,76 +1,77 @@
-import time
+import asyncio
+import aiohttp
 import pandas as pd
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
-from backend.data_pipelines.scrapers.baseclass import BaseScraper
+import re
 
 
-class LetterboxdScraper(BaseScraper):
-    """Scraper for Letterboxd watchlist."""
+class LetterboxdScraper:
+    """Scraper for Letterboxd watchlist using asynchronous fetching."""
 
-    def fetch_data(self, url):
-        """Fetch all pages of the Letterboxd watchlist."""
-        self.driver.get(url)
-        all_html = []
+    async def fetch_html(self, session, url):
+        """Asynchronously fetch the HTML of a given URL."""
+        async with session.get(url) as response:
+            return await response.text()
 
-        while True:
-            time.sleep(0.5)  # Wait for content to load
-            all_html.append(self.driver.page_source)  # Save HTML content
+    async def fetch_all_pages(self, base_url):
+        """Fetch all pages of the Letterboxd watchlist asynchronously."""
+        async with aiohttp.ClientSession() as session:
+            # First, get the first page to determine pagination
+            first_page_html = await self.fetch_html(session, base_url)
+            soup = BeautifulSoup(first_page_html, "html.parser")
 
-            # Try to find and click the "Next" button
-            try:
-                next_button = WebDriverWait(self.driver, 0.1).until(
-                    EC.element_to_be_clickable((By.CLASS_NAME, "next"))
+            # Extract total number of pages
+            pagination = soup.select_one("div.pagination")
+            if pagination:
+                last_page = max(
+                    [int(a.text) for a in pagination.select("a") if a.text.isdigit()],
+                    default=1,
                 )
-                next_button.click()
-                time.sleep(0.3)  # Allow new content to load                
-            except:
-                break  # Exit loop when no more pages
+            else:
+                last_page = 1
 
-        return "\n".join(all_html)  # Return concatenated HTML
+            # Generate all URLs
+            page_urls = [f"{base_url}page/{i}/" for i in range(1, last_page + 1)]
+
+            # Fetch all pages concurrently
+            tasks = [self.fetch_html(session, url) for url in page_urls]
+            pages_html = await asyncio.gather(*tasks)
+
+        return "\n".join(pages_html)  # Return concatenated HTML
 
     def parse_data(self, raw_html):
-        self.raw_html = raw_html
-
         """Extract movie details from the HTML content as a DataFrame."""
         soup = BeautifulSoup(raw_html, "html.parser")
         movies = []
 
         for movie in soup.select("li.poster-container"):
-            title_tag = movie.select_one("a.frame")
-            title = title_tag["data-original-title"] if title_tag else None
-            link = f"https://letterboxd.com{title_tag['href']}" if title_tag else None
-            poster_tag = movie.select_one("img.image")
-            poster_url = poster_tag["src"] if poster_tag else None
+            # Extract film slug (used for title and link)
             film_slug_tag = movie.select_one("div.film-poster")
             film_slug = film_slug_tag["data-film-slug"] if film_slug_tag else None
+
+            # Extract title (not directly available, needs an additional request in some cases)
+            title = film_slug.replace("-", " ").title() if film_slug else None
+
+            # Remove the year and parentheses if in the format "(YYYY)"
+            title = re.sub(r"\s*\d{4}", "", title) if title else None
 
             movies.append(
                 {
                     "title": title.lower(),
-                    "year": None,  # Year needs to be fetched separately
-                    "link": link,
-                    "poster_url": poster_url,
+                    "year": None,  # Needs to be fetched separately
+                    "link": None,
+                    "poster_url": None,
                     "film_slug": film_slug,
-                    "date_added": pd.Timestamp.now(),  # Current timestamp for when added
+                    "date_added": pd.Timestamp.now(),
                 }
             )
 
-        movies = pd.DataFrame(movies)
-
-        # Extract year and move it to 'year' column
-        movies["year"] = movies["title"].str.extract(r"\((\d{4})\)").astype("Int64")
-
-        # Remove the year from the title and lowercase it
-        movies["title"] = movies["title"].str.replace(r"\s*\(\d{4}\)", "", regex=True).str.lower()
-
-        return movies
+        return pd.DataFrame(movies)
 
     def run(self, url):
         """Execute full scraping pipeline and return structured DataFrames."""
-        raw_html = self.fetch_data(url)
+        raw_html = asyncio.run(self.fetch_all_pages(url))
+        with open("output.html", "w") as file:
+            file.write(raw_html)
         watchlist_df = self.parse_data(raw_html=raw_html)
-        self.driver.quit()
         return watchlist_df

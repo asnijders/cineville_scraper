@@ -1,6 +1,5 @@
 import hashlib
 import re
-import pandas as pd
 
 
 def normalize_and_hash(title: str, year: str = None) -> str:
