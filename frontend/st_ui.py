@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 st.set_page_config(layout="wide")
 st.title("Amsterdam Screening Finder")
 
-ordered_days = ["Today", "Tomorrow"] + sorted(
-    [(datetime.now() + timedelta(days=i)).strftime("%A (%b %d)") for i in range(2, 7)],
-    key=lambda d: datetime.strptime(d.split(" (")[0], "%A").weekday(),
-)
+# Correct ordering of days
+ordered_days = ["Today", "Tomorrow"] + [
+    (datetime.now() + timedelta(days=i)).strftime("%A (%b %d)") for i in range(2, 7)
+]
 ordered_days.insert(0, "All Days")
 
 col1, col2 = st.columns([2, 1])
@@ -78,10 +78,26 @@ if not movies_df.empty:
         minutes = int(match.group(2).replace("M", "") if match.group(2) else 0)
         total_duration = timedelta(hours=hours, minutes=minutes)
 
-        screenings_list = [
-            f"[{row['cinema']} - {row['show_datetime'].strftime('%H:%M')} (~ {round_to_quarter_hour(row['show_datetime'] + total_duration).strftime('%H:%M')})]({row['ticket_url']})"
-            for _, row in screenings.iterrows()
-        ]
+        screenings_by_day = {}
+        for _, row in screenings.iterrows():
+            show_date = row['show_datetime'].date()
+            if show_date == datetime.now().date():
+                day_label = "Today"
+            elif show_date == (datetime.now() + timedelta(days=1)).date():
+                day_label = "Tomorrow"
+            else:
+                day_label = row['show_datetime'].strftime("%A (%b %d)")
+            
+            screening_info = (
+                f"[{row['cinema']} - {row['show_datetime'].strftime('%H:%M')} (~ {round_to_quarter_hour(row['show_datetime'] + total_duration).strftime('%H:%M')})]({row['ticket_url']})"
+            )
+            
+            if day_label not in screenings_by_day:
+                screenings_by_day[day_label] = []
+            screenings_by_day[day_label].append(screening_info)
+
+        # Sort screenings by "Today", "Tomorrow", then dated days
+        sorted_screenings_by_day = {day: screenings_by_day[day] for day in ordered_days[1:] if day in screenings_by_day}
 
         with columns[index % 6]:
             with st.container():
@@ -99,7 +115,9 @@ if not movies_df.empty:
                     st.write(f"Rating: ({rating:.1f}/10)")
 
                 with st.expander("Screenings"):
-                    for screening in screenings_list:
-                        st.write(f"- {screening}")
+                    for day, screenings_list in sorted_screenings_by_day.items():
+                        st.markdown(f"{day}")
+                        for screening in screenings_list:
+                            st.write(f"- {screening}")
 
                 st.markdown("---")
