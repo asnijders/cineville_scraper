@@ -7,37 +7,30 @@ from io import BytesIO
 from PIL import Image
 import logging
 import time
+import logging
 from backend.data_pipelines.scrapers.letterboxd import LetterboxdScraper
 import os
 import streamlit as st
 
-# Set up logging
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Media folder path
 MEDIA_FOLDER = "media"
-os.makedirs(MEDIA_FOLDER, exist_ok=True)  # Ensure media folder exists efficiently
+os.makedirs(MEDIA_FOLDER, exist_ok=True)
 
 
 def load_image(image_url, movie_id):
-    """Loads and caches an image from a URL efficiently."""
     image_path = os.path.join(MEDIA_FOLDER, f"{movie_id}_poster.jpg")
-
     if os.path.exists(image_path):
         return Image.open(image_path)
-
     try:
-        start_time = time.time()
-        response = requests.get(
-            image_url, stream=True, timeout=5
-        )  # Stream download, set timeout
+        response = requests.get(image_url, stream=True, timeout=5)
         if response.status_code == 200:
-            image = Image.open(response.raw).convert(
-                "RGB"
-            )  # Avoid unnecessary BytesIO wrapping
-            image.thumbnail((320, 435))  # Resize before saving
-            image.save(image_path, "JPEG", quality=85)  # Optimize file size
-            logger.info(f"Image saved: {image_path} in {time.time() - start_time:.2f}s")
+            image = Image.open(response.raw).convert("RGB")
+            image.thumbnail((320, 435))
+            image.save(image_path, "JPEG", quality=85)
             return image
     except Exception as e:
         logger.error(f"Error loading image from {image_url}: {e}")
@@ -45,26 +38,47 @@ def load_image(image_url, movie_id):
 
 
 def get_db_connection():
-    """Creates a persistent database connection."""
     return sqlite3.connect("backend/db.sqlite3", check_same_thread=False)
 
 
-@st.cache_resource(show_spinner=False)
-def get_movies_with_screenings():
-    """Fetches movies with screenings efficiently."""
+def get_filtered_movies(selected_day, selected_time, only_cineville, watchlist_titles):
     conn = get_db_connection()
     query = """
         SELECT m.movie_id, m.title, m.year, m.rating, m.plot, m.duration,
                m.director, m.genres, c.name AS cinema, c.partnered_with_cineville, 
                s.show_datetime, s.ticket_url, m.poster_url
         FROM screenings s
-        JOIN movies m ON s.movie_id = m.movie_id  -- INNER JOIN speeds up query
+        JOIN movies m ON s.movie_id = m.movie_id
         JOIN cinemas c ON s.cinema_id = c.cinema_id
-        ORDER BY s.show_datetime
+        WHERE 1 = 1
     """
-    df = pd.read_sql(query, conn, parse_dates=["show_datetime"])
-    conn.close()
+    params = []
 
+    if selected_day != "All Days":
+        target_date = datetime.now() + timedelta(
+            days=(
+                ["Today", "Tomorrow"].index(selected_day)
+                if selected_day in ["Today", "Tomorrow"]
+                else 0
+            )
+        )
+        query += " AND DATE(s.show_datetime) = ?"
+        params.append(target_date.strftime("%Y-%m-%d"))
+
+    if selected_time:
+        query += " AND TIME(s.show_datetime) >= ?"
+        params.append(selected_time)
+
+    if only_cineville:
+        query += " AND c.partnered_with_cineville = 1"
+
+    if watchlist_titles:
+        watchlist_placeholders = ",".join("?" * len(watchlist_titles))
+        query += f" AND m.title IN ({watchlist_placeholders})"
+        params.extend(watchlist_titles)
+
+    df = pd.read_sql(query, conn, params=params, parse_dates=["show_datetime"])
+    conn.close()
     df["formatted_day"] = df["show_datetime"].dt.strftime("%A (%b %d)")
     df["title"] = df["title"].str.title()
     df["cinema"] = df["cinema"].str.title()
@@ -72,7 +86,6 @@ def get_movies_with_screenings():
 
 
 def format_day(date):
-    """Formats the date as Today, Tomorrow, or a weekday name."""
     today = datetime.now().date()
     delta_days = (date.date() - today).days
     return (
@@ -82,33 +95,40 @@ def format_day(date):
     )
 
 
-@st.cache_data
 def fuzzy_match_titles(movie_title, watchlist_titles, threshold=85):
-    """Efficient fuzzy matching using process.extractOne."""
     if pd.isna(movie_title) or not watchlist_titles:
         return False
+    
+    start_time = time.time()  # Start timing
+    
     match, score = process.extractOne(
         movie_title.strip(), watchlist_titles, scorer=fuzz.partial_ratio
     )
+    
+    end_time = time.time()  # End timing
+    elapsed_time = end_time - start_time
+    logger.info(f"fuzzy_match_titles executed in {elapsed_time:.6f} seconds")
+    
     return score >= threshold
 
 
 def get_watchlist_titles(username):
-    """Fetches Letterboxd watchlist efficiently."""
     if not username:
         return []
-
-    logger.info(f"Fetching Letterboxd watchlist for: {username}")
-    start_time = time.time()
+    
+    start_time = time.time()  # Start timing
+    
     lb_scraper = LetterboxdScraper()
     watchlist_df = lb_scraper.run(f"https://letterboxd.com/{username}/watchlist/")
-    elapsed_time = time.time() - start_time
-    logger.info(f"Fetched Letterboxd watchlist in {elapsed_time:.2f}s")
+    
+    end_time = time.time()  # End timing
+    elapsed_time = end_time - start_time
+    logger.info(f"get_watchlist_titles executed in {elapsed_time:.6f} seconds")
+    
     return watchlist_df["title"].tolist() if "title" in watchlist_df else []
 
 
 def round_to_quarter_hour(time_obj):
-    """Rounds time to the nearest quarter-hour efficiently."""
     minutes = (time_obj.minute // 15 + 1) * 15
     return time_obj.replace(
         minute=0 if minutes == 60 else minutes, second=0, microsecond=0
