@@ -7,6 +7,7 @@ from PIL import Image
 import logging
 import time
 from backend.data_pipelines.scrapers.letterboxd import LetterboxdScraper
+from backend.data_pipelines.scrapers.letterboxdasync import LetterboxdScraperNew
 import os
 import streamlit as st
 
@@ -103,27 +104,12 @@ def get_watchlist_titles(username):
 
     # --- Step 1: Scrape Letterboxd Watchlist ---
     scrape_start_time = time.time()
-
-    lb_scraper = LetterboxdScraper()
+    lb_scraper = LetterboxdScraperNew()
     watchlist_df = lb_scraper.run(f"https://letterboxd.com/{username}/watchlist/")
-
-    # Combine title and year for better matching
-    if "title" in watchlist_df and "year" in watchlist_df:
-        watchlist_titles = [
-            f"{row['title']} {row['year']}"
-            for _, row in watchlist_df.iterrows()
-            if pd.notna(row["year"])
-        ]
-    else:
-        watchlist_titles = []
-
+    watchlist_titles = watchlist_df.title.tolist()
     scrape_end_time = time.time()
     scrape_elapsed = scrape_end_time - scrape_start_time
     logger.info(f"Letterboxd scraping executed in {scrape_elapsed:.6f} seconds")
-
-    if not watchlist_titles:
-        logger.info("No watchlist titles found.")
-        return []
 
     # --- Step 2: Fetch Unique Movie Titles from Database ---
     conn = get_db_connection()
@@ -132,11 +118,7 @@ def get_watchlist_titles(username):
     conn.close()
 
     # Combine title and year for better matching
-    db_titles = [
-        f"{row['title']} {row['year']}"
-        for _, row in db_titles_df.iterrows()
-        if pd.notna(row["year"])
-    ]
+    db_titles = db_titles_df.title.tolist()
 
     if not db_titles:
         logger.warning("No movie titles found in the database.")
@@ -144,15 +126,14 @@ def get_watchlist_titles(username):
 
     # --- Step 3: Match Watchlist Titles to DB Titles ---
     match_start_time = time.time()
-
     matched_titles = []
     for watchlist_title in watchlist_titles:
         match, score, _ = process.extractOne(
-            watchlist_title, db_titles, scorer=fuzz.partial_ratio
+            watchlist_title, db_titles, scorer=fuzz.token_sort_ratio
         )
-        if score >= 95:  # High confidence threshold
-            logger.info(f"Strong match found for: {watchlist_title} -> {match}")
-            matched_titles.append(match[:-5])
+        if score >= 95:  # Lower threshold for better flexibility
+            logger.info(f"Strong match found for: {watchlist_title} -> {match} ({score})")
+            matched_titles.append(match)
 
     match_end_time = time.time()
     match_elapsed = match_end_time - match_start_time
@@ -162,8 +143,6 @@ def get_watchlist_titles(username):
     total_end_time = time.time()
     total_elapsed = total_end_time - total_start_time
     logger.info(f"get_watchlist_titles executed in {total_elapsed:.6f} seconds")
-
-    logger.info(matched_titles)
 
     return matched_titles
 
