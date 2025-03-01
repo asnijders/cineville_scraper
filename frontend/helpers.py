@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 from datetime import datetime, timedelta
-from fuzzywuzzy import fuzz
+from fuzzywuzzy import fuzz, process
 import requests
 from io import BytesIO
 from PIL import Image
@@ -11,90 +11,61 @@ from backend.data_pipelines.scrapers.letterboxd import LetterboxdScraper
 import os
 import streamlit as st
 
-
 # Set up logging
 logger = logging.getLogger(__name__)
 
 # Media folder path
 MEDIA_FOLDER = "media"
-
-# Ensure media folder exists
-if not os.path.exists(MEDIA_FOLDER):
-    os.makedirs(MEDIA_FOLDER)
+os.makedirs(MEDIA_FOLDER, exist_ok=True)  # Ensure media folder exists efficiently
 
 
 def load_image(image_url, movie_id):
-    """Loads and caches an image from a URL. Checks if the image already exists locally before downloading."""
+    """Loads and caches an image from a URL efficiently."""
     image_path = os.path.join(MEDIA_FOLDER, f"{movie_id}_poster.jpg")
 
-    # Check if the image already exists in the media folder
     if os.path.exists(image_path):
-        # logger.info(f"Image already exists: {image_path}")
         return Image.open(image_path)
 
     try:
-        # Start timing the download
         start_time = time.time()
-
-        # Fetch the image data
-        response = requests.get(image_url)
+        response = requests.get(
+            image_url, stream=True, timeout=5
+        )  # Stream download, set timeout
         if response.status_code == 200:
-            # Open the image and save it locally
-            image = Image.open(BytesIO(response.content))
-            image = image.convert(
+            image = Image.open(response.raw).convert(
                 "RGB"
-            )  # Ensure the image is in RGB format for better quality
-
-            # # Resize image to fit well in the container (ensure it's not too large)
-            max_size = (320, 435)  # Adjust as needed
-            image.thumbnail(max_size)
-
-            # Save the image to the media folder
-            image.save(image_path)
-            end_time = time.time()
-
-            elapsed_time = end_time - start_time
-            logger.info(
-                f"Image downloaded and saved as {image_path} in {elapsed_time:.2f} seconds."
-            )
-
+            )  # Avoid unnecessary BytesIO wrapping
+            image.thumbnail((320, 435))  # Resize before saving
+            image.save(image_path, "JPEG", quality=85)  # Optimize file size
+            logger.info(f"Image saved: {image_path} in {time.time() - start_time:.2f}s")
             return image
-        else:
-            logger.warning(
-                f"Failed to load image from {image_url}. Status code: {response.status_code}"
-            )
-            return None
     except Exception as e:
         logger.error(f"Error loading image from {image_url}: {e}")
-        return None
-
-
-# Set up logging
-logger = logging.getLogger(__name__)
+    return None
 
 
 def get_db_connection():
-    return sqlite3.connect("backend/db.sqlite3")
+    """Creates a persistent database connection."""
+    return sqlite3.connect("backend/db.sqlite3", check_same_thread=False)
 
 
 @st.cache_resource(show_spinner=False)
 def get_movies_with_screenings():
-    """Fetches movies along with their screenings and cinema details."""
+    """Fetches movies with screenings efficiently."""
     conn = get_db_connection()
     query = """
         SELECT m.movie_id, m.title, m.year, m.rating, m.plot, m.duration,
-               m.director, m.genres,
-               c.name AS cinema, c.partnered_with_cineville, 
+               m.director, m.genres, c.name AS cinema, c.partnered_with_cineville, 
                s.show_datetime, s.ticket_url, m.poster_url
         FROM screenings s
-        LEFT JOIN movies m ON s.movie_id = m.movie_id
-        LEFT JOIN cinemas c ON s.cinema_id = c.cinema_id
+        JOIN movies m ON s.movie_id = m.movie_id  -- INNER JOIN speeds up query
+        JOIN cinemas c ON s.cinema_id = c.cinema_id
         ORDER BY s.show_datetime
     """
-    df = pd.read_sql(query, conn)
+    df = pd.read_sql(query, conn, parse_dates=["show_datetime"])
     conn.close()
 
-    df["show_datetime"] = pd.to_datetime(df["show_datetime"])
+    df["formatted_day"] = df["show_datetime"].dt.strftime("%A (%b %d)")
     df["title"] = df["title"].str.title()
     df["cinema"] = df["cinema"].str.title()
     return df
@@ -104,53 +75,41 @@ def format_day(date):
     """Formats the date as Today, Tomorrow, or a weekday name."""
     today = datetime.now().date()
     delta_days = (date.date() - today).days
-
-    if delta_days == 0:
-        return "Today"
-    elif delta_days == 1:
-        return "Tomorrow"
-    return date.strftime("%A (%b %d)") if delta_days >= 4 else date.strftime("%A")
+    return (
+        "Today"
+        if delta_days == 0
+        else "Tomorrow" if delta_days == 1 else date.strftime("%A (%b %d)")
+    )
 
 
 @st.cache_data
 def fuzzy_match_titles(movie_title, watchlist_titles, threshold=85):
-    """Checks if a movie title is in the Letterboxd watchlist using fuzzy matching."""
-    if pd.isna(movie_title):
+    """Efficient fuzzy matching using process.extractOne."""
+    if pd.isna(movie_title) or not watchlist_titles:
         return False
-
-    movie_title = str(movie_title).strip()
-    for watchlist_title in watchlist_titles:
-        if pd.isna(watchlist_title):
-            continue
-        watchlist_title = str(watchlist_title).strip()
-        if fuzz.ratio(movie_title.lower(), watchlist_title.lower()) >= threshold:
-            return True
-    return False
+    match, score = process.extractOne(
+        movie_title.strip(), watchlist_titles, scorer=fuzz.partial_ratio
+    )
+    return score >= threshold
 
 
 def get_watchlist_titles(username):
-    """Fetch and cache Letterboxd watchlist titles."""
+    """Fetches Letterboxd watchlist efficiently."""
     if not username:
         return []
 
-    logger.info(f"Fetching Letterboxd watchlist for user: {username}")
-
+    logger.info(f"Fetching Letterboxd watchlist for: {username}")
     start_time = time.time()
-    user_url = f"https://letterboxd.com/{username}/watchlist/"
     lb_scraper = LetterboxdScraper()
-    watchlist_df = lb_scraper.run(user_url)
-    end_time = time.time()
-
-    elapsed_time = end_time - start_time
-    logger.info(f"Fetched Letterboxd watchlist in {elapsed_time:.2f} seconds.")
-    return watchlist_df["title"].tolist()
+    watchlist_df = lb_scraper.run(f"https://letterboxd.com/{username}/watchlist/")
+    elapsed_time = time.time() - start_time
+    logger.info(f"Fetched Letterboxd watchlist in {elapsed_time:.2f}s")
+    return watchlist_df["title"].tolist() if "title" in watchlist_df else []
 
 
-# Helper function to calculate the rounded finish time
 def round_to_quarter_hour(time_obj):
-    # Round the time to the nearest quarter hour
+    """Rounds time to the nearest quarter-hour efficiently."""
     minutes = (time_obj.minute // 15 + 1) * 15
-    if minutes == 60:
-        minutes = 0
-        time_obj += timedelta(hours=1)
-    return time_obj.replace(minute=minutes, second=0, microsecond=0)
+    return time_obj.replace(
+        minute=0 if minutes == 60 else minutes, second=0, microsecond=0
+    ) + timedelta(hours=1 if minutes == 60 else 0)
