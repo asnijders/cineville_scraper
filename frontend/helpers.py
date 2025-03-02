@@ -53,13 +53,17 @@ def get_filtered_movies(selected_day, selected_time, only_cineville, watchlist_t
     params = []
 
     if selected_day != "All Days":
-        target_date = datetime.now() + timedelta(
-            days=(
-                ["Today", "Tomorrow"].index(selected_day)
-                if selected_day in ["Today", "Tomorrow"]
-                else 0
-            )
-        )
+        today = datetime.now().date()
+        if selected_day == "Today":
+            target_date = today
+        elif selected_day == "Tomorrow":
+            target_date = today + timedelta(days=1)
+        else:
+            try:
+                target_date = datetime.strptime(selected_day, "%A (%b %d)").date().replace(year=today.year)
+            except ValueError:
+                raise ValueError(f"Invalid date format: {selected_day}")
+        
         query += " AND DATE(s.show_datetime) = ?"
         params.append(target_date.strftime("%Y-%m-%d"))
 
@@ -82,15 +86,6 @@ def get_filtered_movies(selected_day, selected_time, only_cineville, watchlist_t
     df["cinema"] = df["cinema"].str.title()
     return df
 
-
-def format_day(date):
-    today = datetime.now().date()
-    delta_days = (date.date() - today).days
-    return (
-        "Today"
-        if delta_days == 0
-        else "Tomorrow" if delta_days == 1 else date.strftime("%A (%b %d)")
-    )
 
 
 def get_watchlist_titles(username):
