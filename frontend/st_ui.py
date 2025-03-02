@@ -80,24 +80,26 @@ if not movies_df.empty:
 
         screenings_by_day = {}
         for _, row in screenings.iterrows():
-            show_date = row['show_datetime'].date()
+            show_date = row["show_datetime"].date()
             if show_date == datetime.now().date():
                 day_label = "Today"
             elif show_date == (datetime.now() + timedelta(days=1)).date():
                 day_label = "Tomorrow"
             else:
-                day_label = row['show_datetime'].strftime("%A (%b %d)")
-            
-            screening_info = (
-                f"[{row['cinema']} - {row['show_datetime'].strftime('%H:%M')} (~ {round_to_quarter_hour(row['show_datetime'] + total_duration).strftime('%H:%M')})]({row['ticket_url']})"
-            )
-            
+                day_label = row["show_datetime"].strftime("%A (%b %d)")
+
+            screening_info = f"[{row['cinema']} - {row['show_datetime'].strftime('%H:%M')} (~ {round_to_quarter_hour(row['show_datetime'] + total_duration).strftime('%H:%M')})]({row['ticket_url']})"
+
             if day_label not in screenings_by_day:
                 screenings_by_day[day_label] = []
             screenings_by_day[day_label].append(screening_info)
 
         # Sort screenings by "Today", "Tomorrow", then dated days
-        sorted_screenings_by_day = {day: screenings_by_day[day] for day in ordered_days[1:] if day in screenings_by_day}
+        sorted_screenings_by_day = {
+            day: screenings_by_day[day]
+            for day in ordered_days[1:]
+            if day in screenings_by_day
+        }
 
         with columns[index % 6]:
             with st.container():
@@ -115,7 +117,7 @@ if not movies_df.empty:
                 if rating:
                     st.write(f"Rating: ({rating:.1f}/10)")
                 if title.lower() in watchlist_titles:
-                    st.write('_On your Letterboxd watchlist_.')
+                    st.write("_On your Letterboxd watchlist_.")
 
                 with st.expander("Screenings"):
                     for day, screenings_list in sorted_screenings_by_day.items():
