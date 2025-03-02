@@ -5,7 +5,9 @@ from helpers import (
     load_image,
     get_watchlist_titles,
     round_to_quarter_hour,
+    get_mood_based_titles
 )
+from backend.recommendation.vector_search import MovieEmbedder
 import logging
 import re
 
@@ -42,13 +44,24 @@ with col2:
 with st.expander("Advanced Filters"):
     letterboxd_username = st.text_input("Enter your Letterboxd username")
 
-    @st.cache_data(show_spinner=False)
     def get_watchlist(username):
         return get_watchlist_titles(username) if username else []
 
     watchlist_titles = get_watchlist(letterboxd_username)
 
     only_watchlist = st.checkbox("Only show my Letterboxd watchlist", value=False)
+
+    # New feature: User query for recommendations
+    user_query = st.text_input("Describe what kind of movie you’re in the mood for")
+    recommend_movies = st.button("Find Recommendations")
+    recommended_titles = []
+
+    if user_query:
+        
+        # TODO: only compute embeddings for titles currently showing!
+        recommended_titles = get_mood_based_titles(user_query)
+
+        logger.info(recommended_titles)
 
 col3, col4 = st.columns([1, 1])
 with col3:
@@ -60,7 +73,16 @@ movies_df = get_filtered_movies(
     selected_time,
     only_cineville,
     watchlist_titles if only_watchlist else None,
+    recommended_titles if recommended_titles else None,
 )
+
+# here for some reason not all the movies are retrieved
+# so its not in the display logic but probably in the matching logic
+# Found by algo:
+# INFO:__main__:['bottoms', 'velvet goldmine', 'miséricorde', 'queer', 'wicked (ov)', 'polarized']
+# found after querying db:
+# titles:  ['Miséricorde' 'Queer' 'Wicked (Ov)' 'Polarized']
+print('titles: ', movies_df.title.unique())
 
 # Group and sort
 if not movies_df.empty:
@@ -94,7 +116,6 @@ if not movies_df.empty:
                 screenings_by_day[day_label] = []
             screenings_by_day[day_label].append(screening_info)
 
-        # Sort screenings by "Today", "Tomorrow", then dated days
         sorted_screenings_by_day = {
             day: screenings_by_day[day]
             for day in ordered_days[1:]
@@ -118,6 +139,8 @@ if not movies_df.empty:
                     st.write(f"Rating: ({rating:.1f}/10)")
                 if title.lower() in watchlist_titles:
                     st.write("_On your Letterboxd watchlist_.")
+                if title in recommended_titles:
+                    st.write("_Recommended based on your query_.")
 
                 with st.expander("Screenings"):
                     for day, screenings_list in sorted_screenings_by_day.items():

@@ -7,7 +7,9 @@ from PIL import Image
 import logging
 import time
 from backend.data_pipelines.scrapers.letterboxd import LetterboxdScraper
+from backend.recommendation.vector_search import MovieEmbedder
 import os
+import streamlit as st
 
 
 # Configure logging
@@ -39,7 +41,7 @@ def get_db_connection():
     return sqlite3.connect("backend/db.sqlite3", check_same_thread=False)
 
 
-def get_filtered_movies(selected_day, selected_time, only_cineville, watchlist_titles):
+def get_filtered_movies(selected_day, selected_time, only_cineville, watchlist_titles, recommended_titles):
     conn = get_db_connection()
     query = """
         SELECT DISTINCT(m.movie_id), m.title, m.year, m.rating, m.plot, m.duration,
@@ -79,6 +81,11 @@ def get_filtered_movies(selected_day, selected_time, only_cineville, watchlist_t
         query += f" AND m.title IN ({watchlist_placeholders})"
         params.extend(watchlist_titles)
 
+    if recommended_titles:
+        recommended_placeholders = ",".join("?" * len(recommended_titles))
+        query += f" AND m.title IN ({recommended_placeholders})"
+        params.extend(recommended_titles)
+
     df = pd.read_sql(query, conn, params=params, parse_dates=["show_datetime"])
     conn.close()
     df["formatted_day"] = df["show_datetime"].dt.strftime("%A (%b %d)")
@@ -86,6 +93,28 @@ def get_filtered_movies(selected_day, selected_time, only_cineville, watchlist_t
     df["cinema"] = df["cinema"].str.title()
     return df
 
+
+# Load the embedder *once* at the global level
+@st.cache_resource(show_spinner=False)
+def load_embedder():
+    embedder = MovieEmbedder(
+        df=None,
+        embed_model="intfloat/e5-large-v2",
+        rerank_model="cross-encoder/ms-marco-MiniLM-L-12-v2",
+    )
+    embedder.load_embeddings("backend/recommendation/movies_with_embeddings.csv")
+    return embedder
+
+
+# Use the cached embedder
+def get_mood_based_titles(user_query):
+    start_time = time.time()
+    embedder = load_embedder()  # Use cached instance
+    _ = embedder.get_mood_recommendations(user_query, top_k=6)
+    recommended_titles = embedder.df.sort_values(by="similarity", ascending=False)["title"].tolist()[:12]
+    end_time = time.time()
+    logger.info(f"Vector search executed in {end_time - start_time:.6f} seconds")
+    return recommended_titles
 
 
 def get_watchlist_titles(username):
