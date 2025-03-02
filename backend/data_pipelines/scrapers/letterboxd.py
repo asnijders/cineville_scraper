@@ -71,7 +71,5 @@ class LetterboxdScraper:
     def run(self, url):
         """Execute full scraping pipeline and return structured DataFrames."""
         raw_html = asyncio.run(self.fetch_all_pages(url))
-        with open("output.html", "w") as file:
-            file.write(raw_html)
         watchlist_df = self.parse_data(raw_html=raw_html)
         return watchlist_df
