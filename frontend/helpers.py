@@ -50,7 +50,7 @@ def get_filtered_movies(selected_day, selected_time, only_cineville, watchlist_t
         FROM screenings s
         JOIN movies m ON s.movie_id = m.movie_id
         JOIN cinemas c ON s.cinema_id = c.cinema_id
-        WHERE 1 = 1
+        WHERE s.show_datetime > DATETIME('now', 'localtime')
     """
     params = []
 
