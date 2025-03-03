@@ -62,10 +62,12 @@ with st.expander("Advanced Filters"):
         recommended_titles = get_mood_based_titles(user_query)
 
         logger.info(recommended_titles)
-
-col3, col4 = st.columns([1, 1])
-with col3:
+    
     only_cineville = st.checkbox("Only show Cineville theaters", value=True)
+
+col3, col4 = st.columns([1, 0.3])
+# with col3:
+#     only_cineville = st.checkbox("Only show Cineville theaters", value=True)
 
 # Fetch filtered movies
 movies_df = get_filtered_movies(
@@ -75,6 +77,9 @@ movies_df = get_filtered_movies(
     watchlist_titles if only_watchlist else None,
     recommended_titles if recommended_titles else None,
 )
+
+with col3:
+    st.write(f'Found {len(movies_df)} screenings for {len(movies_df.title.unique())} films')
 
 # here for some reason not all the movies are retrieved
 # so its not in the display logic but probably in the matching logic
