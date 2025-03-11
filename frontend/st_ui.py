@@ -7,7 +7,6 @@ from helpers import (
     round_to_quarter_hour,
     get_mood_based_titles
 )
-from backend.recommendation.vector_search import MovieEmbedder
 import logging
 import re
 
@@ -16,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 st.set_page_config(layout="wide")
-st.title("Amsterdam Screening Finder")
+st.title("Screenwatch")
 
 # Correct ordering of days
 ordered_days = ["Today", "Tomorrow"] + [

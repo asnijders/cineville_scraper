@@ -7,7 +7,7 @@ from PIL import Image
 import logging
 import time
 from backend.data_pipelines.scrapers.letterboxd import LetterboxdScraper
-from backend.recommendation.vector_search import MovieEmbedder
+from backend.vector_search.vector_search import MovieEmbedder
 import os
 import streamlit as st
 
@@ -102,7 +102,7 @@ def load_embedder():
         embed_model="intfloat/e5-large-v2",
         rerank_model="cross-encoder/ms-marco-MiniLM-L-12-v2",
     )
-    embedder.load_embeddings("backend/recommendation/movies_with_embeddings.csv")
+    embedder.load_embeddings("backend/vector_search/movies_with_embeddings.csv")
     return embedder
 
 
