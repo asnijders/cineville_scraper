@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="foMe8gM8JJsNDT-7GSy8" name="Page-1">
-        <mxGraphModel dx="785" dy="622" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="890" dy="400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -82,6 +82,9 @@
                 </mxCell>
                 <mxCell id="25" value="&lt;font face=&quot;Courier New&quot;&gt;Cinemas with&lt;/font&gt;&lt;div&gt;&lt;font face=&quot;Courier New&quot;&gt;cineville tag&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
                     <mxGeometry x="610" y="180" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="27" value="&lt;b&gt;IMDB&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="1080" y="90" width="120" height="60" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>
