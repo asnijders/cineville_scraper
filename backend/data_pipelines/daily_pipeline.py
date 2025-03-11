@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 from data_pipelines.scrapers.filmladder import FilmladderScraper
 from data_pipelines.utils.helpers import normalize_and_hash
-from data_pipelines.save_to_db import get_existing_movies
+from backend.data_models.save_to_db import get_existing_movies
 from rapidfuzz import process
 
 # from db.database import save_movies, save_screenings, save_cinemas
