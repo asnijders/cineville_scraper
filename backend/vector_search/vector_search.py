@@ -4,9 +4,7 @@ import ast
 from tqdm import tqdm
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from sklearn.metrics.pairwise import cosine_similarity
-from rank_bm25 import BM25Okapi  # BM25 for lexical search
 import html
-
 
 class MovieEmbedder:
     def __init__(
@@ -158,16 +156,5 @@ class MovieEmbedder:
         # Compute cosine similarity
         similarities = cosine_similarity([query_embedding], np.stack(self.df["embedding"].values))[0]
         self.df["similarity"] = similarities
-
-        # # Select top N candidates for reranking
-        # candidates = self.df.nlargest(rerank_top_n, "similarity")
-
-        # # Use `text_to_embed` for reranking (ensures consistency)
-        # query_movie_pairs = [(user_query, text) for text in candidates["text_to_embed"].tolist()]
-        # rerank_scores = self.rerank_model.predict(query_movie_pairs)
-
-        # # Update candidates with rerank scores and return top_k results
-        # candidates["rerank_score"] = rerank_scores
-        # results = candidates.nlargest(top_k, "rerank_score")[["title", "plot", "text_to_embed"]]
 
         return self.df
