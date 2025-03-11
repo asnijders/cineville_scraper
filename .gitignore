@@ -15,3 +15,4 @@ backend/recommendation/mlruns
 backend/recommendation/plots
 *.csv
 backend/recommendation/api_key.py
+backend/vector_search/api_key.py
