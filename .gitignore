@@ -10,5 +10,8 @@ movie_data
 *.sqlite3
 .ipynb_checkpoints
 media
-
-
+*.db
+backend/recommendation/mlruns
+backend/recommendation/plots
+*.csv
+backend/recommendation/api_key.py
