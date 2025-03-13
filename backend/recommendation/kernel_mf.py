@@ -45,7 +45,8 @@ class MF_Recommender():
         self.movie_data = self._downsample_titles(self.movie_data)
         self.movie_data = self._assign_user_id(self.movie_data)
         if top_n_members:
-            self.movie_data = self._downsample_members(self.movie_data, top_n_members)
+            self.movie_data = self._downsample_members(self.movie_data, 
+                                                       top_n_members)
 
         X = self.movie_data[['user_id', 'item_id']]
         y = self.movie_data['rating']
@@ -75,7 +76,7 @@ class MF_Recommender():
                 min_rating=self.config.get('min_rating', 1),
                 max_rating=self.config.get('max_rating', 10)
             )
-            
+
             self.matrix_fact.fit(self.X_train, self.y_train)
 
     def test(self):
