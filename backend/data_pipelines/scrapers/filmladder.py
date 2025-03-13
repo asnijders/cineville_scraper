@@ -90,14 +90,14 @@ class FilmladderScraper(BaseScraper):
 
                         screenings_data.append(
                             {
-                                "cinema_name": cinema_name.lower(),
-                                "title": title.lower(),
-                                "year": movie_year,
-                                "show_datetime": show_datetime,
-                                "ticket_url": ticket_url,
-                                "rating": rating,
-                                "movie_link": movie_link,
-                                "poster_url": img_url,
+                                "fl_cinema_name": cinema_name.lower(),
+                                "fl_title": title.lower(),
+                                "fl_year": movie_year,
+                                "fl_show_datetime": show_datetime,
+                                "fl_ticket_url": ticket_url,
+                                "fl_rating": rating,
+                                "fl_movie_link": movie_link,
+                                "fl_poster_url": img_url,
                             }
                         )
 
@@ -109,3 +109,6 @@ class FilmladderScraper(BaseScraper):
         screenings_df, cinemas_df = self.parse_data(raw_html=raw_html)
         self.driver.quit()
         return screenings_df, cinemas_df
+
+
+class ReferralFetcher():
