@@ -36,7 +36,7 @@ def get_new_movies(scraped_movies):
 
 def process_screenings(df):
 
-    def deduplicate_movie_titles(screenings_df, title_column="title", threshold=90):
+    def deduplicate_movie_titles(screenings_df, title_column="fl_title", threshold=90):
         """_summary_
 
         This function identifies and filters out highly similar film titles from screenings
@@ -77,12 +77,12 @@ def process_screenings(df):
         # df["movie_id"] = df.apply(
         #     lambda row: normalize_and_hash(row["title"], row["year"]), axis=1
         # )
-        df["cinema_id"] = df.apply(
-            lambda row: normalize_and_hash(row["cinema_name"], "Amsterdam"), axis=1
+        df["fl_cinema_id"] = df.apply(
+            lambda row: normalize_and_hash(row["fl_cinema_name"], "Amsterdam"), axis=1
         )
         return df
 
-    df["show_datetime"] = df["show_datetime"].apply(
+    df["fl_show_datetime"] = df["fl_show_datetime"].apply(
         lambda x: datetime.fromisoformat(x) if isinstance(x, str) else x
     )
 
@@ -106,7 +106,6 @@ def process_cinemas(df):
         """Assign 'cineville' tag for cinemas DataFrame."""
         import os
 
-        print(os.getcwd())
         cineville_tags = pd.read_csv(
             "data_pipelines/external_data/cinema_data/cineville_cinemas.csv"
         )
@@ -155,12 +154,12 @@ def add_imdb_links(df):
 def extract_unique_movies(df):
     """Extract unique movies from screenings DataFrame."""
     movies_df = (
-        df[["movie_id", "title", "year", "movie_link"]]
-        .drop_duplicates('movie_id')
+        df[["fl_title", "fl_year", "fl_movie_link"]]
+        .drop_duplicates('fl_movie_link')
         .reset_index(drop=True)
     )
 
-    movies_df['slug'] = movies_df['movie_link'].apply(lambda x: x.split('/')[-3]) 
+    # movies_df['slug'] = movies_df['movie_link'].apply(lambda x: x.split('/')[-3]) 
 
     return movies_df
 
