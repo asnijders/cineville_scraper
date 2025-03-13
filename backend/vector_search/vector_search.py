@@ -6,6 +6,7 @@ from sentence_transformers import SentenceTransformer, CrossEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 import html
 
+
 class MovieEmbedder:
     def __init__(
         self,
