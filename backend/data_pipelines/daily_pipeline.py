@@ -12,27 +12,44 @@ logging.basicConfig(level=logging.INFO)
 
 
 def get_new_movies(scraped_movies):
+
     existing_movies = get_existing_movies()
     if existing_movies is None:
         print("No existing Movies table found")
         return scraped_movies
 
-    existing_titles = existing_movies["title"].tolist()
+    if 'imdb_id' not in existing_movies.columns.tolist():
+        existing_movies['imdb_id'] = existing_movies['imdb_link'].apply(lambda x: x.split('/')[-1] if x is not None else None)
 
-    def is_title_new(scraped_title):
-        match, score, _ = process.extractOne(scraped_title, existing_titles)
-        found_match = score >= 90  # Adjust threshold as needed
-        print(
-            f"Scraped: '{scraped_title}' | Matched: '{match}' (Existing DB) | Score: {score:.2f} | Found: {found_match}"
-        )
-        return not found_match
+    existing_ids = existing_movies['imdb_id'].unique().tolist()
 
-    return scraped_movies[scraped_movies["title"].apply(is_title_new)]
+    # def is_title_new(scraped_title):
+    #     match, score, _ = process.extractOne(scraped_title, existing_titles)
+    #     found_match = score >= 90  # Adjust threshold as needed
+    #     print(
+    #         f"Scraped: '{scraped_title}' | Matched: '{match}' (Existing DB) | Score: {score:.2f} | Found: {found_match}"
+    #     )
+    #     return not found_match
+
+    return scraped_movies[~scraped_movies["imdb_id"].isin(existing_ids)]
 
 
 def process_screenings(df):
 
     def deduplicate_movie_titles(screenings_df, title_column="title", threshold=90):
+        """_summary_
+
+        This function identifies and filters out highly similar film titles from screenings
+        such as The Brutalist, The Brutalist (IMAX), etcetera
+
+        Args:
+            screenings_df (_type_): DataFrame
+            title_column (str, optional): _description_. Defaults to "title".
+            threshold (int, optional): _description_. Defaults to 90.
+
+        Returns:
+            _type_: DataFrame
+        """
         unique_titles = screenings_df[title_column].unique()
         grouped_titles = {}
 
@@ -57,9 +74,9 @@ def process_screenings(df):
 
     def assign_ids_screenings(df):
         """Assign `movie_id` and `cinema_id` for screenings DataFrame."""
-        df["movie_id"] = df.apply(
-            lambda row: normalize_and_hash(row["title"], row["year"]), axis=1
-        )
+        # df["movie_id"] = df.apply(
+        #     lambda row: normalize_and_hash(row["title"], row["year"]), axis=1
+        # )
         df["cinema_id"] = df.apply(
             lambda row: normalize_and_hash(row["cinema_name"], "Amsterdam"), axis=1
         )
@@ -143,6 +160,7 @@ def extract_unique_movies(df):
         .reset_index(drop=True)
     )
 
+    movies_df['slug'] = movies_df['movie_link'].apply(lambda x: x.split('/')[-3]) 
 
     return movies_df
 
