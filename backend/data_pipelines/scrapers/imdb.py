@@ -4,6 +4,7 @@ import pandas as pd
 import random
 import time
 import json
+import re
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 # from .base_scraper import BaseScraper  # Assuming BaseScraper is in the same package
@@ -63,22 +64,26 @@ class IMDBFetcher():
 
     async def run(self, df):
         """Execute full scraping pipeline asynchronously."""
-        urls = df["movie_link"].tolist()
+        urls = df["fl_movie_link"].tolist()
 
         # Fetch content asynchronously
         raw_html_list = await self.scrape_all(urls)
 
         # Parse each page
         results = [
-            (url, self.parse_data(html)) for url, html in zip(urls, raw_html_list)
+            (url, self.parse_data(html)) for url, html in zip(urls,
+                                                              raw_html_list)
         ]
 
         # Convert results to DataFrame and merge
-        results_df = pd.DataFrame(results, columns=["movie_link", "imdb_link"])
-        df = df.merge(results_df, on="movie_link", how="left")
+        results_df = pd.DataFrame(results, columns=["fl_movie_link", 
+                                                    "imdb_link"])
+        df = df.merge(results_df, on="fl_movie_link", how="left")
 
         # Drop rows with duplicate IMDb links (e.g., different screening types)
         df = df.drop_duplicates(subset=["imdb_link"], keep="first")
+
+        df['imdb_id'] = df['imdb_link'].apply(lambda x: x.split('/')[-1] if x is not None else None)
 
         return df
 
@@ -187,5 +192,79 @@ class LetterboxdFetcher():
 
         # Drop rows with duplicate IMDb links (e.g., different screening types)
         df = df.drop_duplicates(subset=["imdb_id"], keep="first")
+
+        return df
+
+
+class ReferralFetcher:
+    """
+    Scraper to fetch film ladder ticket referral links
+    """
+
+    def __init__(self):
+        pass
+
+    async def fetch_data(self, session, url, semaphore):
+        headers = {"User-Agent": random.choice(USER_AGENTS)}
+        """Fetch the HTML content of the final page asynchronously with random sleep."""
+        async with semaphore:
+            try:
+                # Add random sleep to mimic human behavior
+                sleep_time = random.uniform(1, 3)  # Sleep time between 1 and 3 seconds
+                await asyncio.sleep(sleep_time)
+
+                # Allow redirects to follow the chain
+                async with session.get(url, headers=headers, allow_redirects=True) as response:
+                    if response.status == 200:
+                        # Return the HTML content (raw text) of the final response
+                        return await response.text()  # Get the HTML content of the final page
+                    return None
+            except Exception as e:
+                print(f"Error fetching {url}: {e}")
+                return None
+
+    def parse_redirect_url(self, html_content):
+        """
+        Parse the redirect URL from the HTML content.
+
+        Args:
+        - html_content: The raw HTML content of the page as a string.
+
+        Returns:
+        - The redirect URL if found, otherwise None.
+        """
+        # Regular expression to capture the URL in the window.location statement
+        match = re.search(r"window\.location=['\"](https?://[^\s'\"]+)['\"]", html_content)
+        if match:
+            return match.group(1)  # Return the captured URL
+        return None
+
+    async def fetch_all(self, urls, max_concurrent=5):
+        """Fetch all pages asynchronously."""
+        semaphore = asyncio.Semaphore(max_concurrent)
+        connector = aiohttp.TCPConnector(limit=max_concurrent)
+
+        async with aiohttp.ClientSession(connector=connector) as session:
+            tasks = [self.fetch_data(session, url, semaphore) for url in urls]
+            return await asyncio.gather(*tasks)
+
+    async def run(self, df):
+        """Execute full scraping pipeline asynchronously."""
+        urls = df["fl_ticket_url"].tolist()
+
+        # Fetch HTML content for each URL asynchronously
+        html_responses = await self.fetch_all(urls)
+
+        # Parse the redirect URL from each HTML response
+        redirect_urls = [self.parse_redirect_url(html) for html in html_responses]
+
+        # Create a new DataFrame with the original URLs and the redirect URLs
+        results_df = pd.DataFrame({
+            "fl_ticket_url": urls,
+            "redirect_url": redirect_urls
+        })
+
+        # Merge the original DataFrame with the redirect URLs DataFrame
+        df = df.merge(results_df, on="fl_ticket_url", how="left")
 
         return df
