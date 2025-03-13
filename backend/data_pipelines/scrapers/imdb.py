@@ -1,49 +1,77 @@
+import aiohttp
+import asyncio
 import pandas as pd
-import time
 import random
+import time
 import json
-from tqdm import tqdm
 from bs4 import BeautifulSoup
-from data_pipelines.scrapers.baseclass import BaseScraper
+from tqdm import tqdm
+# from .base_scraper import BaseScraper  # Assuming BaseScraper is in the same package
 
 
-class IMDBFetcher(BaseScraper):
-    """Scraper to extract IMDb links from Filmladder movie pages."""
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.129 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.6045.123 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.5993.98 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.5938.132 Safari/537.36"
+    ]
 
-    def fetch_data(self, url):
-        """Fetch raw HTML content from a movie page."""
-        self.driver.get(url)
-        time.sleep(random.uniform(0.3, 1.0))  # Delay to avoid detection
-        return self.driver.page_source
+
+class IMDBFetcher():
+    """Scraper to extract IMDb links from Filmladder movie pages using asyncio."""
+
+    def __init__(self):
+        pass
+
+    async def fetch_data(self, session, url, semaphore):
+        headers = {"User-Agent": random.choice(USER_AGENTS)}
+        """Fetch raw HTML content asynchronously."""
+        async with semaphore:
+            try:
+                async with session.get(url, headers=headers) as response:
+                    if response.status == 200:
+                        return await response.text()
+                    return None
+            except Exception as e:
+                print(f"Error fetching {url}: {e}")
+                return None
+
+    async def scrape_all(self, urls, max_concurrent=5):
+        """Fetch all pages asynchronously."""
+        semaphore = asyncio.Semaphore(max_concurrent)
+        connector = aiohttp.TCPConnector(limit=max_concurrent)
+
+        async with aiohttp.ClientSession(connector=connector) as session:
+            tasks = [self.fetch_data(session, url, semaphore) for url in urls]
+            return await asyncio.gather(*tasks)
 
     def parse_data(self, raw_html):
         """Parse and extract IMDb data-link from HTML."""
-        soup = BeautifulSoup(raw_html, "html.parser")
+        if not raw_html:
+            return None
 
-        # Try to find the IMDb rating span first
+        soup = BeautifulSoup(raw_html, "html.parser")
         imdb_span = soup.find("span", class_="imdb-rating star-rating")
         if imdb_span and imdb_span.has_attr("data-link"):
             return imdb_span["data-link"]
 
-        # If not found, try to find the IMDb button div
         imdb_div = soup.find("div", class_="imdb-button")
         if imdb_div and imdb_div.has_attr("data-link"):
             return imdb_div["data-link"]
 
-        return None  # Return None if no IMDb link is found
+        return None
 
-    def run(self, df):
-        """Execute full scraping pipeline."""
+    async def run(self, df):
+        """Execute full scraping pipeline asynchronously."""
         urls = df["movie_link"].tolist()
-        results = []
 
-        for url in tqdm(urls, desc="Scraping Progress"):
-            raw_html = self.fetch_data(url)
-            imdb_link = self.parse_data(raw_html)
-            time.sleep(random.uniform(0.3, 1.0))  # Random delay to avoid detection
-            results.append((url, imdb_link))
+        # Fetch content asynchronously
+        raw_html_list = await self.scrape_all(urls)
 
-        self.driver.quit()  # Quit driver after scraping
+        # Parse each page
+        results = [
+            (url, self.parse_data(html)) for url, html in zip(urls, raw_html_list)
+        ]
 
         # Convert results to DataFrame and merge
         results_df = pd.DataFrame(results, columns=["movie_link", "imdb_link"])
@@ -55,104 +83,109 @@ class IMDBFetcher(BaseScraper):
         return df
 
 
-class IMDBScraper(BaseScraper):
-    """Scraper to extract metadata from IMDb movie pages."""
+class LetterboxdFetcher():
+    """Scraper to extract TMDB links from Letterboxd movie pages using asyncio."""
 
-    def fetch_data(self, url):
-        """Fetch raw HTML content from an IMDb movie page."""
-        self.driver.get(url)
-        time.sleep(random.uniform(0.5, 1.5))  # Random delay to avoid detection
-        return self.driver.page_source
+    def __init__(self):
+        pass
 
-    def extract_field(self, soup, selector, attr=None, multiple=False):
-        """
-        Extracts a field from the BeautifulSoup object.
-        - If `attr` is None, extracts text.
-        - If `attr` is provided, extracts the attribute value.
-        - If `multiple` is True, returns a list of values.
-        """
-        if multiple:
-            elements = soup.select(selector)
-            return [
-                el.get(attr, "").strip() if attr else el.text.strip() for el in elements
-            ]
-        element = soup.select_one(selector)
-        return (
-            element.get(attr, "").strip()
-            if attr and element
-            else (element.text.strip() if element else None)
-        )
-
-    def parse_json_ld(self, soup):
-        """Extracts metadata from JSON-LD structured data."""
-        script_tag = soup.find("script", type="application/ld+json")
-        if script_tag:
+    async def fetch_data(self, session, url, semaphore):
+        headers = {"User-Agent": random.choice(USER_AGENTS)}
+        """Fetch raw HTML content asynchronously."""
+        async with semaphore:
             try:
-                return json.loads(script_tag.string)
-            except json.JSONDecodeError:
-                return {}
-        return {}
+                async with session.get(url, headers=headers) as response:
+                    if response.status == 200:
+                        return await response.text()
+                    return None
+            except Exception as e:
+                print(f"Error fetching {url}: {e}")
+                return None
+
+    async def scrape_all(self, urls, max_concurrent=5):
+        """Fetch all pages asynchronously."""
+        semaphore = asyncio.Semaphore(max_concurrent)
+        connector = aiohttp.TCPConnector(limit=max_concurrent)
+
+        async with aiohttp.ClientSession(connector=connector) as session:
+            tasks = [self.fetch_data(session, url, semaphore) for url in urls]
+            return await asyncio.gather(*tasks)
 
     def parse_data(self, raw_html):
-        """Parse and extract metadata from IMDb HTML content."""
+        """Parse and extract TMDB ID, IMDb ID, film ID, film slug, and poster URL from HTML."""
+        if not raw_html:
+            return None
+        
         soup = BeautifulSoup(raw_html, "html.parser")
-        json_ld = self.parse_json_ld(soup)  # Extract JSON-LD data
-        next_data = self.parse_next_data(soup)  # Extract __NEXT_DATA__ JSON
-
-        metadata = {
-            # "title": self.extract_field(soup, "h1"),
-            "imdb_year": json_ld.get("datePublished", "").split("-")[0] 
-                        or str(next_data.get("releaseYear", {}).get("year")),
-            "rating": json_ld.get("aggregateRating", {}).get("ratingValue"),
-            "genres": self.extract_field(soup, "span.ipc-chip__text", multiple=True),
-            "content_rating": json_ld.get("contentRating"),
-            "duration": json_ld.get("duration"),
-            "director": [d["name"] for d in json_ld.get("director", []) if "name" in d] 
-                        if isinstance(json_ld.get("director"), list) else None,
-            "writers": [w["name"] for w in json_ld.get("creator", []) if "name" in w] 
-                        if isinstance(json_ld.get("creator"), list) else None,
-            "actors": [a["name"] for a in json_ld.get("actor", []) if "name" in a] 
-                    if isinstance(json_ld.get("actor"), list) else None,
-            "rating_count": json_ld.get("aggregateRating", {}).get("ratingCount"),
-            "plot": json_ld.get("description"),
-            "release_date": json_ld.get("datePublished"),
-            "keywords": json_ld.get("keywords", "").split(", ") if json_ld.get("keywords") else [],
-            "poster_url": json_ld.get("image"),
-            "trailer_url": json_ld.get("trailer", {}).get("embedUrl"),
+        
+        data = {
+            "tmdb_id": None,
+            "imdb_id": None,
+            "lb_film_id": None,
+            "lb_film_slug": None,
+            "lb_poster_url": None
         }
         
-        return metadata
-
-
-    def parse_next_data(self, soup):
-        """Extract data from __NEXT_DATA__ JSON."""
-        next_data_script = soup.find("script", id="__NEXT_DATA__", type="application/json")
-        if next_data_script:
+        # Extract TMDB ID from body tag
+        body_tag = soup.find("body", class_="film backdropped")
+        if body_tag:
+            data["tmdb_id"] = body_tag.get("data-tmdb-id")
+        
+        # Extract TMDB ID from TMDB link
+        tmdb_link = soup.find("a", class_="micro-button track-event", attrs={"data-track-action": "TMDB"})
+        if tmdb_link and "themoviedb.org/movie/" in tmdb_link["href"]:
             try:
-                return json.loads(next_data_script.string).get("props", {}).get("pageProps", {}).get("aboveTheFoldData", {})
-            except json.JSONDecodeError:
-                pass  # Return empty dict if parsing fails
-        return {}
+                data["tmdb_id"] = tmdb_link["href"].split("/")[-2]  # Extracts the ID from the URL
+            except IndexError:
+                pass
+        
+        # Extract IMDb ID from IMDb link
+        imdb_link = soup.find("a", class_="micro-button track-event", attrs={"data-track-action": "IMDb"})
+        if imdb_link and "imdb.com/title/" in imdb_link["href"]:
+            try:
+                data["imdb_id"] = imdb_link["href"].split("/")[-2]  # Extracts the IMDb ID from the URL
+            except IndexError:
+                pass
+        
+        # Extract film ID and film slug from backdrop container
+        backdrop_div = soup.find("div", class_="backdrop-wrapper")
+        if backdrop_div:
+            data["lb_film_id"] = backdrop_div.get("data-film-id")
+            data["lb_film_slug"] = backdrop_div.get("data-film-slug")
+        
+        # Extract poster URL
+        poster_div = soup.find("div", class_="really-lazy-load", attrs={"data-type": "film"})
+        if poster_div:
+            data["lb_poster_url"] = poster_div.get("data-poster-url")
+        
+        return data
 
+    async def run(self, df):
+        """Execute full scraping pipeline asynchronously."""
 
-    def run(self, df):
-        """Execute full scraping pipeline to gather IMDb metadata."""
-        urls = df["imdb_link"].dropna().unique().tolist()  # Avoid duplicates
-        self.metadata_results = []
+        def build_url(imdb_id):
+            return f'https://letterboxd.com/imdb/{imdb_id}'
 
-        for url in tqdm(urls, desc="Scraping IMDb Metadata"):
-            raw_html = self.fetch_data(url)
-            metadata = self.parse_data(raw_html)
-            metadata["imdb_link"] = url  # Ensure we keep the link for merging
-            time.sleep(random.uniform(1, 3))  # Random to avoid detection
-            self.metadata_results.append(metadata)
+        # print(df)
+        df['letterboxd_url'] = df['imdb_id'].apply(lambda x: build_url(x))
+        urls = df["letterboxd_url"].tolist()
 
-        self.driver.quit()  # Quit driver after scraping
+        # Fetch content asynchronously
+        raw_html_list = await self.scrape_all(urls)
 
-        metadata_df = pd.DataFrame(self.metadata_results)
+        # Parse each page
+        results = [
+            self.parse_data(html) for html in raw_html_list
+        ]
 
-        # Merge on imdb_link instead of title
-        df = df.merge(metadata_df, on="imdb_link", how="left")
-        df["release_date"] = pd.to_datetime(df["release_date"]).dt.date
+        # Convert results to DataFrame and merge
+        results_df = pd.DataFrame(results)
+
+        # print)
+        
+        df = df.merge(results_df, on="imdb_id", how="left")
+
+        # Drop rows with duplicate IMDb links (e.g., different screening types)
+        df = df.drop_duplicates(subset=["imdb_id"], keep="first")
 
         return df

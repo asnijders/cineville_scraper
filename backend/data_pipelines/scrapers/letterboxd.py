@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import re
 
 
-class LetterboxdScraper:
+class WatchlistScraper:
     """Scraper for Letterboxd watchlist using asynchronous fetching."""
 
     async def fetch_html(self, session, url):
