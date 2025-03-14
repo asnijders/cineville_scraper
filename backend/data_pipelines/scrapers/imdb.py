@@ -186,8 +186,6 @@ class LetterboxdFetcher():
         # Convert results to DataFrame and merge
         results_df = pd.DataFrame(results)
 
-        # print)
-        
         df = df.merge(results_df, on="imdb_id", how="left")
 
         # Drop rows with duplicate IMDb links (e.g., different screening types)
@@ -210,7 +208,7 @@ class ReferralFetcher:
         async with semaphore:
             try:
                 # Add random sleep to mimic human behavior
-                sleep_time = random.uniform(1, 3)  # Sleep time between 1 and 3 seconds
+                sleep_time = random.uniform(0.3, 1)  # Sleep time between 1 and 3 seconds
                 await asyncio.sleep(sleep_time)
 
                 # Allow redirects to follow the chain
@@ -239,7 +237,7 @@ class ReferralFetcher:
             return match.group(1)  # Return the captured URL
         return None
 
-    async def fetch_all(self, urls, max_concurrent=5):
+    async def fetch_all(self, urls, max_concurrent=10):
         """Fetch all pages asynchronously."""
         semaphore = asyncio.Semaphore(max_concurrent)
         connector = aiohttp.TCPConnector(limit=max_concurrent)
