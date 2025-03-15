@@ -74,9 +74,7 @@ def process_screenings(df):
 
     def assign_ids_screenings(df):
         """Assign `movie_id` and `cinema_id` for screenings DataFrame."""
-        # df["movie_id"] = df.apply(
-        #     lambda row: normalize_and_hash(row["title"], row["year"]), axis=1
-        # )
+
         df["fl_cinema_id"] = df.apply(
             lambda row: normalize_and_hash(row["fl_cinema_name"], "Amsterdam"), axis=1
         )
