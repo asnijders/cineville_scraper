@@ -18,7 +18,7 @@ USER_AGENTS = [
     ]
 
 
-class IMDBFetcher():
+class IMDBFetcher:
     """Scraper to extract IMDb links from Filmladder movie pages using asyncio."""
 
     def __init__(self):
@@ -120,9 +120,9 @@ class LetterboxdFetcher():
         """Parse and extract TMDB ID, IMDb ID, film ID, film slug, and poster URL from HTML."""
         if not raw_html:
             return None
-        
+
         soup = BeautifulSoup(raw_html, "html.parser")
-        
+
         data = {
             "tmdb_id": None,
             "imdb_id": None,
@@ -130,12 +130,12 @@ class LetterboxdFetcher():
             "lb_film_slug": None,
             "lb_poster_url": None
         }
-        
+
         # Extract TMDB ID from body tag
         body_tag = soup.find("body", class_="film backdropped")
         if body_tag:
             data["tmdb_id"] = body_tag.get("data-tmdb-id")
-        
+
         # Extract TMDB ID from TMDB link
         tmdb_link = soup.find("a", class_="micro-button track-event", attrs={"data-track-action": "TMDB"})
         if tmdb_link and "themoviedb.org/movie/" in tmdb_link["href"]:
@@ -143,7 +143,7 @@ class LetterboxdFetcher():
                 data["tmdb_id"] = tmdb_link["href"].split("/")[-2]  # Extracts the ID from the URL
             except IndexError:
                 pass
-        
+
         # Extract IMDb ID from IMDb link
         imdb_link = soup.find("a", class_="micro-button track-event", attrs={"data-track-action": "IMDb"})
         if imdb_link and "imdb.com/title/" in imdb_link["href"]:
@@ -151,18 +151,18 @@ class LetterboxdFetcher():
                 data["imdb_id"] = imdb_link["href"].split("/")[-2]  # Extracts the IMDb ID from the URL
             except IndexError:
                 pass
-        
+
         # Extract film ID and film slug from backdrop container
         backdrop_div = soup.find("div", class_="backdrop-wrapper")
         if backdrop_div:
             data["lb_film_id"] = backdrop_div.get("data-film-id")
             data["lb_film_slug"] = backdrop_div.get("data-film-slug")
-        
+
         # Extract poster URL
         poster_div = soup.find("div", class_="really-lazy-load", attrs={"data-type": "film"})
         if poster_div:
             data["lb_poster_url"] = poster_div.get("data-poster-url")
-        
+
         return data
 
     async def run(self, df):
