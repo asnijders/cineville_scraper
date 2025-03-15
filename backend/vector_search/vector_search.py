@@ -42,7 +42,7 @@ class MovieEmbedder:
         tmdb_reviews = self.safe_parse(row.get("tmdb_reviews", "{}"))
         tmdb_credits = self.safe_parse(row.get("tmdb_credits", "{}"))
         
-        title = tmdb_info.get("title", "This")
+        title = "This"
         genres = [genre["name"] for genre in tmdb_info.get("genres", [])]
         if title and genres:
             parts.append(f"{title} is a {', '.join(genres)} film.")
@@ -50,6 +50,13 @@ class MovieEmbedder:
             parts.append(f"{title} is a film.")
         elif genres:
             parts.append(f"This is a {', '.join(genres)} film.")
+
+        # Plot (Required field)
+        plot = tmdb_info.get("overview", "").strip()
+        if plot:
+            parts.append(f"Plot: {self.clean_text(plot)}")
+        else:
+            return None  # Skip entry if plot is missing
         
         # Content rating (if available)
         if "content_rating" in tmdb_info:
@@ -76,22 +83,18 @@ class MovieEmbedder:
         if rating and rating_count:
             parts.append(f"The movie has a rating of {rating} based on {rating_count} reviews.")
 
-        # Plot (Required field)
-        plot = tmdb_info.get("overview", "").strip()
-        if plot:
-            parts.append(f"Plot: {self.clean_text(plot)}")
-        else:
-            return None  # Skip entry if plot is missing
-
         # Reviews (sorted by shortest first)
         reviews = tmdb_reviews.get("results", [])
         sorted_reviews = sorted(reviews, key=lambda r: len(r.get("content", "")))
-
+        if len(sorted_reviews) > 2:
+            num_sentences = 3
+        else:
+            num_sentences = 6
         review_texts = []
         for review in sorted_reviews:
             content = self.clean_text(review.get("content", ""))
             sentences = re.split(r"(?<=[.!?])\s+", content)  # Split into sentences
-            review_excerpt = " ".join(sentences[:5])  # Take up to 5 sentences
+            review_excerpt = " ".join(sentences[:num_sentences])  # Take up to 5 sentences
             if review_excerpt:
                 review_texts.append(f'A reviewer said: "{review_excerpt}"')
 
