@@ -1,130 +1,109 @@
 import pandas as pd
 import numpy as np
-import ast
 from tqdm import tqdm
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from sklearn.metrics.pairwise import cosine_similarity
 import html
-
+import json
+import re
 
 class MovieEmbedder:
-    def __init__(
-        self,
-        df,
-        embed_model="sentence-transformers/all-mpnet-base-v2",
-        rerank_model="BAAI/bge-reranker-large",
-        hybrid_weight=0.5,
-    ):  
+    def __init__(self, df, embed_model="sentence-transformers/all-mpnet-base-v2"):  
         """Initialize the MovieEmbedder class."""
         self.embed_model = SentenceTransformer(embed_model)
-        self.rerank_model = CrossEncoder(rerank_model)
         self.df = df
-        self.hybrid_weight = hybrid_weight  
-        self.bm25 = None  
 
     @staticmethod
-    def parse_keywords(keywords):
-        """Safely parse keyword lists stored as strings."""
+    def safe_parse(value, default=None):
+        """Safely parse a JSON-like string into a Python object."""
+        if pd.isna(value) or not isinstance(value, str):
+            return default if default is not None else {}
         try:
-            parsed = ast.literal_eval(keywords)
-            return " ".join(parsed) if isinstance(parsed, list) else ""
+            return json.loads(value)
         except (ValueError, SyntaxError):
-            return ""
+            return default if default is not None else {}
+
+    @staticmethod
+    def clean_text(text):
+        """Remove HTML tags and extra whitespace from text."""
+        text = re.sub(r"<.*?>", "", text)  # Remove HTML tags
+        text = text.replace("\r", " ").replace("\n", " ")  # Remove newlines
+        return text.strip()
+
+    def format_entry(self, row):
+        """Format metadata into a structured text description."""
+        parts = []
+
+        if pd.isna(row.tmdb_id):
+            return None
+        
+        tmdb_info = self.safe_parse(row.get("tmdb_info", "{}"))
+        tmdb_keywords = self.safe_parse(row.get("tmdb_keywords", "{}"))
+        tmdb_reviews = self.safe_parse(row.get("tmdb_reviews", "{}"))
+        tmdb_credits = self.safe_parse(row.get("tmdb_credits", "{}"))
+        
+        title = tmdb_info.get("title", "This")
+        genres = [genre["name"] for genre in tmdb_info.get("genres", [])]
+        if title and genres:
+            parts.append(f"{title} is a {', '.join(genres)} film.")
+        elif title:
+            parts.append(f"{title} is a film.")
+        elif genres:
+            parts.append(f"This is a {', '.join(genres)} film.")
+        
+        # Content rating (if available)
+        if "content_rating" in tmdb_info:
+            parts.append(f"It has a parental guidance content rating of {tmdb_info['content_rating']}.")
+
+        # Keywords
+        keywords = [kw["name"] for kw in tmdb_keywords.get("keywords", [])]
+        if keywords:
+            parts.append(f"Important themes include: {', '.join(keywords)}.")
+
+        # Director and cast
+        directors = tmdb_credits.get("directors", [])
+        cast = tmdb_credits.get("cast", [])[:5]  # Limit to top 5 actors
+        if directors and cast:
+            parts.append(f"It is directed by {', '.join(directors)} and stars {', '.join(cast)}.")
+        elif directors:
+            parts.append(f"It is directed by {', '.join(directors)}.")
+        elif cast:
+            parts.append(f"It stars {', '.join(cast)}.")
+
+        # Ratings
+        rating = tmdb_info.get("vote_average")
+        rating_count = tmdb_info.get("vote_count")
+        if rating and rating_count:
+            parts.append(f"The movie has a rating of {rating} based on {rating_count} reviews.")
+
+        # Plot (Required field)
+        plot = tmdb_info.get("overview", "").strip()
+        if plot:
+            parts.append(f"Plot: {self.clean_text(plot)}")
+        else:
+            return None  # Skip entry if plot is missing
+
+        # Reviews (sorted by shortest first)
+        reviews = tmdb_reviews.get("results", [])
+        sorted_reviews = sorted(reviews, key=lambda r: len(r.get("content", "")))
+
+        review_texts = []
+        for review in sorted_reviews:
+            content = self.clean_text(review.get("content", ""))
+            sentences = re.split(r"(?<=[.!?])\s+", content)  # Split into sentences
+            review_excerpt = " ".join(sentences[:5])  # Take up to 5 sentences
+            if review_excerpt:
+                review_texts.append(f'A reviewer said: "{review_excerpt}"')
+
+        if review_texts:
+            parts.append(" ".join(review_texts))
+
+        return " ".join(parts)
 
     def prepare_text(self):
-        """Prepare structured text for embeddings with better formatting. Drops rows where 'plot' is NaN."""
-        
-        def safe_parse_list(value):
-            """Safely parse a list-like string or return an empty list."""
-            if pd.isna(value) or not isinstance(value, str):
-                return []
-            try:
-                parsed = ast.literal_eval(value)
-                return parsed if isinstance(parsed, list) else []
-            except (ValueError, SyntaxError):
-                return []
-
-        def clean_director(director):
-            """Clean director field, removing list-like artifacts."""
-            if isinstance(director, str):
-                try:
-                    parsed = ast.literal_eval(director)
-                    if isinstance(parsed, list):
-                        return ", ".join(parsed)  # Convert list to a clean string
-                except (ValueError, SyntaxError):
-                    pass
-            return director.strip()
-
-        def format_entry(row):
-            """Format text dynamically for better embeddings."""
-            parts = []
-
-            # Movie title and genre
-            title = row.get("title", "").strip()
-            genres = [g for g in safe_parse_list(row.get("genres", "")) if g.lower() != "back to top"]  # Remove "Back to top"
-            title = ''
-            if title and genres:
-                parts.append(f"{title.title()} is a {', '.join(genres)} film.")
-            elif title:
-                parts.append(f"{title.title()} is a film.")
-            elif genres:
-                parts.append(f"This is a {', '.join(genres)} film.")
-
-            # content rating
-            content_rating = row.get("content_rating", "")
-            if content_rating:
-                parts.append(f"It has a parental guidance content rating of {content_rating}.")
-
-            # Keywords
-            keywords = self.parse_keywords(row.get("keywords", ""))
-            if keywords:
-                parts.append(f"Important themes include: {keywords}.")
-
-            # Director and actors
-            director = clean_director(row.get("director", ""))
-            actors = safe_parse_list(row.get("actors", ""))
-            if director and actors:
-                parts.append(f"It is directed by {director} and stars {', '.join(actors)}.")
-            elif director:
-                parts.append(f"It is directed by {director}.")
-            elif actors:
-                parts.append(f"It stars {', '.join(actors)}.")
-
-            # Rating
-            rating = row.get("rating", "")
-            rating_count = row.get("rating_count", "")
-            if rating and rating_count:
-                parts.append(f"The movie has a rating of {rating} based on {rating_count} reviews.")
-
-            # Plot (this is required, so it should not be NaN)
-            plot = str(row.get("plot", "")).strip()  # Convert NaN to an empty string
-            if plot:
-                parts.append(f"Plot: {html.unescape(plot)}")  # Decode HTML entities
-            else:
-                return None  # If plot is missing, remove this row
-
-            # Keywords
-            keywords = self.parse_keywords(row.get("keywords", ""))
-            if keywords:
-                parts.append(f"Important themes include: {keywords}.")
-
-            return " ".join(parts)
-
-        # Drop rows where 'plot' is NaN before applying transformations
-        self.df = self.df.dropna(subset=["plot"])
-
-        # Apply formatting to each row, filtering out any None results
-        self.df["text_to_embed"] = self.df.apply(format_entry, axis=1)
+        """Apply formatting to dataframe rows and filter out missing entries."""
+        self.df["text_to_embed"] = self.df.apply(self.format_entry, axis=1)
         self.df = self.df.dropna(subset=["text_to_embed"])  # Drop any rows where formatting failed
-
-
-        # Drop rows where 'plot' is NaN before applying transformations
-        self.df = self.df.dropna(subset=["plot"])
-
-        # Apply formatting to each row, filtering out any None results
-        self.df["text_to_embed"] = self.df.apply(format_entry, axis=1)
-        self.df = self.df.dropna(subset=["text_to_embed"])  # Drop any rows where formatting failed
-
 
     def generate_embeddings(self):
         """Generate sentence embeddings and store them in the DataFrame."""
