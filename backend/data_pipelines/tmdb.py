@@ -8,7 +8,6 @@ import os
 
 load_dotenv()  # Load environment variables from .env file
 api_key = os.getenv("API_KEY")
-print(f"Loaded API Key: {api_key}")
 tmdb.API_KEY = api_key
 
 
