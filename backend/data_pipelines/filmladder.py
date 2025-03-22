@@ -17,6 +17,11 @@ class ScreeningScraper(Scraper):
         return raw_html[0] if raw_html else None
 
     def parse_data(self, raw_html):
+
+        def extract_slug(url):
+            match = re.search(r'/film/([^/]+)/', url)
+            return match.group(1) if match else None
+
         """Extract cinema and screening data from HTML."""
         soup = BeautifulSoup(raw_html, "html.parser")
         cinemas = soup.find_all("div", class_="cinema")
@@ -54,8 +59,8 @@ class ScreeningScraper(Scraper):
                 rating_tag = movie.find("span", class_="star-rating")
                 rating = rating_tag.text.strip() if rating_tag else None
 
-                movie_link = title_tag["href"] if title_tag and title_tag.has_attr("href") else ""
-                year_match = re.search(r"-(\d{4})/", movie_link)
+                movie_url = title_tag["href"] if title_tag and title_tag.has_attr("href") else ""
+                year_match = re.search(r"-(\d{4})/", movie_url)
                 movie_year = year_match.group(1) if year_match else None
 
                 days = movie.find_all("div", class_="day with-perfomances")
@@ -74,7 +79,8 @@ class ScreeningScraper(Scraper):
                             "fl_show_datetime": show_datetime,
                             "fl_ticket_url": ticket_url,
                             "fl_rating": rating,
-                            "fl_movie_link": movie_link,
+                            "fl_url": movie_url,
+                            "fl_slug": extract_slug(movie_url),
                             "fl_poster_url": img_url,
                         })
 
@@ -117,7 +123,7 @@ class ImdbIdScraper(Scraper):
         """Execute full scraping pipeline asynchronously."""
 
         await self.setup_redis()
-        urls = df["fl_movie_link"].tolist()
+        urls = df["fl_url"].tolist()
 
         # Fetch content asynchronously
         raw_html_list = await self.scrape_all(urls)
@@ -129,14 +135,14 @@ class ImdbIdScraper(Scraper):
             await self.close_redis()
 
             # Convert results to DataFrame and merge
-            results_df = pd.DataFrame(results, columns=["fl_movie_link", "imdb_link"])
-            df = df.merge(results_df, on="fl_movie_link", how="left")
+            results_df = pd.DataFrame(results, columns=["fl_url", "imdb_url"])
+            df = df.merge(results_df, on="fl_url", how="left")
 
             # Drop duplicate IMDb links (handling different screening types)
-            df = df.drop_duplicates(subset=["imdb_link"], keep="first")
+            df = df.drop_duplicates(subset=["imdb_url"], keep="first")
 
             # Extract IMDb ID using regex for efficiency
-            df["imdb_id"] = df["imdb_link"].str.extract(r'/title/(tt\d+)')
+            df["imdb_id"] = df["imdb_url"].str.extract(r'/title/(tt\d+)')
 
         return df
 
