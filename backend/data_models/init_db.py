@@ -1,4 +1,4 @@
-from data_models.base import init_db
+from backend.data_models.db import init_db
 
 init_db()
-print("✅ SQLite Database Initialized!")
+print("✅ Database Initialized!")
