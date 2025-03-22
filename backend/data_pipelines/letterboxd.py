@@ -17,8 +17,8 @@ USER_AGENTS = [
 class TmdbIdScraper(Scraper):
     """Scraper to extract TMDB links from Letterboxd movie pages using asyncio."""
 
-    def __init__(self):
-        super().__init__()  # Inherit USER_AGENTS from Scraper
+    def __init__(self, cache_expiry=86400):  # Default expiry: 24 hours
+        super().__init__(cache_expiry=cache_expiry)  # Pass to Scraper
 
     def parse_data(self, raw_html):
         """Parse and extract TMDB ID, IMDb ID, film ID, film slug, and poster URL from HTML."""
@@ -76,11 +76,13 @@ class TmdbIdScraper(Scraper):
             return f'https://letterboxd.com/imdb/{imdb_id}'
 
         # print(df)
-        df['letterboxd_url'] = df['imdb_id'].apply(lambda x: build_url(x))
+        df.loc[:, 'letterboxd_url'] = df['imdb_id'].apply(lambda x: build_url(x))
         urls = df["letterboxd_url"].tolist()
 
         # Fetch content asynchronously
+        await self.setup_redis()
         raw_html_list = await self.scrape_all(urls)
+        await self.close_redis()
 
         # Parse each page
         results = [
@@ -97,7 +99,7 @@ class TmdbIdScraper(Scraper):
 
         # Ensure all None/NaN/null values are consistently represented as np.nan
         df.replace(["None", "null"], np.nan, inplace=True)  # If string "None" or "null" are present
-        df = df.applymap(lambda x: np.nan if pd.isna(x) else x)  # Convert None and NaN to np.nan
+        df = df.map(lambda x: np.nan if pd.isna(x) else x)  # Convert None and NaN to np.nan
 
         return df
 

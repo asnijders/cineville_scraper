@@ -7,8 +7,8 @@ from .scraper import Scraper
 class ScreeningScraper(Scraper):
     """Scraper for Filmladder screening and cinema data."""
 
-    def __init__(self):
-        super().__init__()  # Inherit USER_AGENTS
+    def __init__(self, cache_expiry=86400):  # Default expiry: 24 hours
+        super().__init__(cache_expiry=cache_expiry)  # Pass to Scraper
         self.FILMLADDER_URL = "https://www.filmladder.nl/amsterdam/bioscopen"
 
     async def fetch_filmladder_data(self):
@@ -82,17 +82,25 @@ class ScreeningScraper(Scraper):
 
     async def run(self):
         """Execute full scraping pipeline asynchronously and return structured DataFrames."""
-        raw_html = await self.fetch_filmladder_data()
+        await self.setup_redis()  # Initialize Redis (before any requests)
+
+        raw_html = await self.fetch_filmladder_data()  # Make requests (ensure it uses fetch_data internally)
+
         if raw_html:
-            return self.parse_data(raw_html)
-        return pd.DataFrame(), pd.DataFrame()
+            parsed_data = self.parse_data(raw_html)
+        else:
+            parsed_data = (pd.DataFrame(), pd.DataFrame())  # Default empty DataFrames
+
+        await self.close_redis()  # Clean up Redis connection after everything
+
+        return parsed_data  # Return structured data
 
 
 class ImdbIdScraper(Scraper):
     """Scraper to extract IMDb links from Filmladder movie pages asynchronously."""
 
-    def __init__(self):
-        super().__init__()  # Inherit USER_AGENTS
+    def __init__(self, cache_expiry=86400):  # Default expiry: 24 hours
+        super().__init__(cache_expiry=cache_expiry)  # Pass to Scraper
 
     def parse_data(self, raw_html):
         """Parse and extract IMDb data-link from HTML."""
@@ -107,23 +115,28 @@ class ImdbIdScraper(Scraper):
 
     async def run(self, df):
         """Execute full scraping pipeline asynchronously."""
+
+        await self.setup_redis()
         urls = df["fl_movie_link"].tolist()
 
         # Fetch content asynchronously
         raw_html_list = await self.scrape_all(urls)
 
-        # Parse each page
-        results = [(url, self.parse_data(html)) for url, html in zip(urls, raw_html_list)]
+        if raw_html_list:
 
-        # Convert results to DataFrame and merge
-        results_df = pd.DataFrame(results, columns=["fl_movie_link", "imdb_link"])
-        df = df.merge(results_df, on="fl_movie_link", how="left")
+            # Parse each page
+            results = [(url, self.parse_data(html)) for url, html in zip(urls, raw_html_list)]
+            await self.close_redis()
 
-        # Drop duplicate IMDb links (handling different screening types)
-        df = df.drop_duplicates(subset=["imdb_link"], keep="first")
+            # Convert results to DataFrame and merge
+            results_df = pd.DataFrame(results, columns=["fl_movie_link", "imdb_link"])
+            df = df.merge(results_df, on="fl_movie_link", how="left")
 
-        # Extract IMDb ID using regex for efficiency
-        df["imdb_id"] = df["imdb_link"].str.extract(r'/title/(tt\d+)')
+            # Drop duplicate IMDb links (handling different screening types)
+            df = df.drop_duplicates(subset=["imdb_link"], keep="first")
+
+            # Extract IMDb ID using regex for efficiency
+            df["imdb_id"] = df["imdb_link"].str.extract(r'/title/(tt\d+)')
 
         return df
 
@@ -132,9 +145,9 @@ class RedirectUrlScraper(Scraper):
     """
     Scraper to fetch film ladder ticket referral links
     """
-    
-    def __init__(self):
-        super().__init__()  # Inherit USER_AGENTS from Scraper
+
+    def __init__(self, cache_expiry=86400):  # Default expiry: 24 hours
+        super().__init__(cache_expiry=cache_expiry)  # Pass to Scraper
 
     def parse_redirect_url(self, html_content):
         """
@@ -151,22 +164,29 @@ class RedirectUrlScraper(Scraper):
         return match.group(1) if match else None
 
     async def run(self, df):
+
+        await self.setup_redis()
         """Execute full scraping pipeline asynchronously."""
         urls = df["fl_ticket_url"].tolist()
 
         # Fetch HTML content for each URL asynchronously using inherited scrape_all
         html_responses = await self.scrape_all(urls)
 
-        # Parse the redirect URL from each HTML response
-        redirect_urls = [self.parse_redirect_url(html) for html in html_responses]
+        if html_responses:
 
-        # Create a new DataFrame with the original URLs and the redirect URLs
-        results_df = pd.DataFrame({
-            "fl_ticket_url": urls,
-            "redirect_url": redirect_urls
-        })
+            # Parse the redirect URL from each HTML response
+            redirect_urls = [self.parse_redirect_url(html) for html in html_responses]
+            await self.close_redis()
 
-        # Merge the original DataFrame with the redirect URLs DataFrame
-        df = df.merge(results_df, on="fl_ticket_url", how="left")
+            # Create a new DataFrame with the original URLs and the redirect URLs
+            results_df = pd.DataFrame({
+                "fl_ticket_url": urls,
+                "redirect_url": redirect_urls
+            })
 
-        return df
+            # Merge the original DataFrame with the redirect URLs DataFrame
+            df = df.merge(results_df, on="fl_ticket_url", how="left")
+
+            return df
+        else:
+            return df
