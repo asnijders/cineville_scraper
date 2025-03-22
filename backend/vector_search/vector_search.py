@@ -1,11 +1,11 @@
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
-from sentence_transformers import SentenceTransformer, CrossEncoder
+from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-import html
 import json
 import re
+
 
 class MovieEmbedder:
     def __init__(self, df, embed_model="sentence-transformers/all-mpnet-base-v2"):  
@@ -16,10 +16,10 @@ class MovieEmbedder:
     @staticmethod
     def safe_parse(value, default=None):
         """Safely parse a JSON-like string into a Python object."""
-        if pd.isna(value) or not isinstance(value, str):
+        if pd.isna(value) or not isinstance(value, dict):
             return default if default is not None else {}
         try:
-            return json.loads(value)
+            return json.loads(json.dumps(value))
         except (ValueError, SyntaxError):
             return default if default is not None else {}
 
@@ -35,13 +35,14 @@ class MovieEmbedder:
         parts = []
 
         if pd.isna(row.tmdb_id):
+            print(f'Skipping embedding for {row.tmdb_id} - id is nan')
             return None
-        
+
         tmdb_info = self.safe_parse(row.get("tmdb_info", "{}"))
         tmdb_keywords = self.safe_parse(row.get("tmdb_keywords", "{}"))
         tmdb_reviews = self.safe_parse(row.get("tmdb_reviews", "{}"))
         tmdb_credits = self.safe_parse(row.get("tmdb_credits", "{}"))
-        
+
         title = "This"
         genres = [genre["name"] for genre in tmdb_info.get("genres", [])]
         if title and genres:
@@ -56,8 +57,9 @@ class MovieEmbedder:
         if plot:
             parts.append(f"Plot: {self.clean_text(plot)}")
         else:
+            print(f'Skipping embedding for {row.tmdb_id} - no overview')
             return None  # Skip entry if plot is missing
-        
+
         # Content rating (if available)
         if "content_rating" in tmdb_info:
             parts.append(f"It has a parental guidance content rating of {tmdb_info['content_rating']}.")
