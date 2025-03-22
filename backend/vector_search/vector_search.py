@@ -8,10 +8,9 @@ import re
 
 
 class MovieEmbedder:
-    def __init__(self, df, embed_model="sentence-transformers/all-mpnet-base-v2"):  
+    def __init__(self, embed_model="sentence-transformers/all-mpnet-base-v2"):  
         """Initialize the MovieEmbedder class."""
         self.embed_model = SentenceTransformer(embed_model)
-        self.df = df
 
     @staticmethod
     def safe_parse(value, default=None):
@@ -105,17 +104,19 @@ class MovieEmbedder:
 
         return " ".join(parts)
 
-    def prepare_text(self):
+    def prepare_text(self, df):
         """Apply formatting to dataframe rows and filter out missing entries."""
-        self.df["text_to_embed"] = self.df.apply(self.format_entry, axis=1)
-        self.df = self.df.dropna(subset=["text_to_embed"])  # Drop any rows where formatting failed
+        df["text_to_embed"] = df.apply(self.format_entry, axis=1)
+        df = df.dropna(subset=["text_to_embed"])  # Drop any rows where formatting failed
+        return df
 
-    def generate_embeddings(self):
+    def generate_embeddings(self, df):
         """Generate sentence embeddings and store them in the DataFrame."""
         tqdm.pandas(desc="Embedding movies")
-        self.df["embedding"] = self.df["text_to_embed"].progress_apply(
+        df["embedding"] = df["text_to_embed"].progress_apply(
             lambda x: self.embed_model.encode(x).tolist()
         )
+        return df
 
     def save_embeddings(self, output_path):
         """Save the DataFrame with embeddings to a CSV file."""

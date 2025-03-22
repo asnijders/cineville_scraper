@@ -28,11 +28,11 @@ class TmdbIdScraper(Scraper):
         soup = BeautifulSoup(raw_html, "html.parser")
 
         data = {
-            "tmdb_id": None,
-            "imdb_id": None,
             "lb_film_id": None,
             "lb_film_slug": None,
-            "lb_poster_url": None
+            "lb_poster_url": None,
+            "tmdb_id": None,
+            "imdb_id": None
         }
 
         # Extract TMDB ID from body tag
@@ -49,10 +49,10 @@ class TmdbIdScraper(Scraper):
                 pass
 
         # Extract IMDb ID from IMDb link
-        imdb_link = soup.find("a", class_="micro-button track-event", attrs={"data-track-action": "IMDb"})
-        if imdb_link and "imdb.com/title/" in imdb_link["href"]:
+        imdb_url = soup.find("a", class_="micro-button track-event", attrs={"data-track-action": "IMDb"})
+        if imdb_url and "imdb.com/title/" in imdb_url["href"]:
             try:
-                data["imdb_id"] = imdb_link["href"].split("/")[-2]  # Extracts the IMDb ID from the URL
+                data["imdb_id"] = imdb_url["href"].split("/")[-2]  # Extracts the IMDb ID from the URL
             except IndexError:
                 pass
 
@@ -76,8 +76,8 @@ class TmdbIdScraper(Scraper):
             return f'https://letterboxd.com/imdb/{imdb_id}'
 
         # print(df)
-        df.loc[:, 'letterboxd_url'] = df['imdb_id'].apply(lambda x: build_url(x))
-        urls = df["letterboxd_url"].tolist()
+        df.loc[:, 'lb_url'] = df['imdb_id'].apply(lambda x: build_url(x))
+        urls = df["lb_url"].tolist()
 
         # Fetch content asynchronously
         await self.setup_redis()
